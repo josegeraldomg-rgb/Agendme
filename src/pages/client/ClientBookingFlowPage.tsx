@@ -57,9 +57,9 @@ const mockServices: Record<string, { id: string; nome: string; preco: number; du
 };
 
 const mockProfessionals = [
-  { id: "p1", nome: "Dra. Ana Silva", especialidade: "Dermatologista", rating: 4.9, avatar: "AS", slots: ["08:00", "08:30", "09:00", "10:00", "14:00", "15:00"] },
-  { id: "p2", nome: "Dr. Carlos Mendes", especialidade: "Esteticista", rating: 4.7, avatar: "CM", slots: ["09:00", "09:30", "10:30", "11:00", "14:30", "16:00"] },
-  { id: "p3", nome: "Dra. Mariana Costa", especialidade: "Fisioterapeuta", rating: 4.8, avatar: "MC", slots: ["08:00", "10:00", "11:00", "14:00", "15:30", "16:30"] },
+  { id: "p1", nome: "Dra. Ana Silva", especialidade: "Dermatologista", rating: 4.9, avatar: "AS" },
+  { id: "p2", nome: "Dr. Carlos Mendes", especialidade: "Esteticista", rating: 4.7, avatar: "CM" },
+  { id: "p3", nome: "Dra. Mariana Costa", especialidade: "Fisioterapeuta", rating: 4.8, avatar: "MC" },
 ];
 
 // Company config mock
