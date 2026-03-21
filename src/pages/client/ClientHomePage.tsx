@@ -31,8 +31,8 @@ export default function ClientHomePage() {
             <p className="text-primary-foreground/70 text-sm">Bem-vindo(a) à</p>
             <h1 className="text-xl font-bold text-primary-foreground">Clínica Beleza & Saúde</h1>
           </div>
-          <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">CB</span>
+          <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-foreground/20 flex items-center justify-center">
+            <img src={logo} alt="Agend.me" className="h-8 w-8" />
           </div>
         </div>
 
