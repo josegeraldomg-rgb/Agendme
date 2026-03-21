@@ -21,7 +21,7 @@ const mockProfessionals = [
 ];
 
 export default function ClientServiceDetailPage() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const service = allServices[id || ""];
 
@@ -29,7 +29,7 @@ export default function ClientServiceDetailPage() {
     return (
       <div className="p-6 text-center text-muted-foreground">
         <p>Serviço não encontrado.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/app")}>Voltar</Button>
+        <Button variant="outline" className="mt-4" onClick={() => navigate(`/app/${slug}`)}>Voltar</Button>
       </div>
     );
   }
@@ -88,7 +88,7 @@ export default function ClientServiceDetailPage() {
 
         <Button
           className="w-full mt-6 mb-6 h-12 rounded-xl text-sm font-semibold"
-          onClick={() => navigate(`/app/agendar`)}
+          onClick={() => navigate(`/app/${slug}/agendar`)}
         >
           Agendar Agora
         </Button>

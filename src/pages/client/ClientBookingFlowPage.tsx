@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, DollarSign, Star, Upload, X, MessageCircle, ChevronRight, Check, CreditCard, QrCode, Smartphone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -73,6 +73,7 @@ type Step = "category" | "service" | "date" | "professional" | "attachment" | "f
 
 export default function ClientBookingFlowPage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const [step, setStep] = useState<Step>("category");
 
   // Selections
@@ -160,7 +161,7 @@ export default function ClientBookingFlowPage() {
     setTimeout(() => {
       setLoading(false);
       toast({ title: "Agendamento confirmado! ✅", description: "Você receberá uma confirmação por WhatsApp." });
-      navigate("/app/historico");
+      navigate(`/app/${slug}/historico`);
     }, 1500);
   };
 
@@ -221,7 +222,7 @@ export default function ClientBookingFlowPage() {
 
   const handleBack = () => {
     if (currentIdx <= 0) {
-      navigate("/app");
+      navigate(`/app/${slug}`);
     } else {
       const prevStep = stepsOrder[currentIdx - 1];
       setStep(prevStep);

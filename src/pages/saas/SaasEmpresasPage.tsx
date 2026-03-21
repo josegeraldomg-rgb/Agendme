@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const mockEmpresas = [
-  { id: "e1", nome: "Clínica Beleza Pura", email: "contato@belezapura.com", plano: "Profissional", status: "ativa" as const, proxima_cobranca: "25/03/2026" },
-  { id: "e2", nome: "Studio Ana Costa", email: "ana@studio.com", plano: "Básico", status: "ativa" as const, proxima_cobranca: "01/04/2026" },
-  { id: "e3", nome: "Estética Renovar", email: "admin@renovar.com", plano: "Premium", status: "ativa" as const, proxima_cobranca: "15/04/2026" },
-  { id: "e4", nome: "Espaço Zen", email: "contato@zen.com", plano: "Básico", status: "inadimplente" as const, proxima_cobranca: "10/03/2026" },
-  { id: "e5", nome: "Clínica Derma+", email: "adm@dermaplus.com", plano: "Profissional", status: "ativa" as const, proxima_cobranca: "20/04/2026" },
-  { id: "e6", nome: "BeautyCare", email: "info@beautycare.com", plano: "Básico", status: "suspensa" as const, proxima_cobranca: "—" },
-  { id: "e7", nome: "Clínica Vitalidade", email: "contato@vitalidade.com", plano: "Premium", status: "ativa" as const, proxima_cobranca: "28/03/2026" },
-  { id: "e8", nome: "Corpo e Mente", email: "admin@corpoemente.com", plano: "Profissional", status: "inadimplente" as const, proxima_cobranca: "05/03/2026" },
+  { id: "e1", nome: "Clínica Beleza Pura", slug: "beleza-pura", email: "contato@belezapura.com", plano: "Profissional", status: "ativa" as const, proxima_cobranca: "25/03/2026" },
+  { id: "e2", nome: "Studio Ana Costa", slug: "studio-ana", email: "ana@studio.com", plano: "Básico", status: "ativa" as const, proxima_cobranca: "01/04/2026" },
+  { id: "e3", nome: "Estética Renovar", slug: "estetica-renovar", email: "admin@renovar.com", plano: "Premium", status: "ativa" as const, proxima_cobranca: "15/04/2026" },
+  { id: "e4", nome: "Espaço Zen", slug: "espaco-zen", email: "contato@zen.com", plano: "Básico", status: "inadimplente" as const, proxima_cobranca: "10/03/2026" },
+  { id: "e5", nome: "Clínica Derma+", slug: "derma-plus", email: "adm@dermaplus.com", plano: "Profissional", status: "ativa" as const, proxima_cobranca: "20/04/2026" },
+  { id: "e6", nome: "BeautyCare", slug: "beautycare", email: "info@beautycare.com", plano: "Básico", status: "suspensa" as const, proxima_cobranca: "—" },
+  { id: "e7", nome: "Clínica Vitalidade", slug: "vitalidade", email: "contato@vitalidade.com", plano: "Premium", status: "ativa" as const, proxima_cobranca: "28/03/2026" },
+  { id: "e8", nome: "Corpo e Mente", slug: "corpo-mente", email: "admin@corpoemente.com", plano: "Profissional", status: "inadimplente" as const, proxima_cobranca: "05/03/2026" },
 ];
 
 const statusStyle: Record<string, string> = {

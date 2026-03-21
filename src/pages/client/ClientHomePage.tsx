@@ -1,9 +1,10 @@
 import { Search, MessageCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import logo from "@/assets/logo-agendme.png";
+import { useClientEmpresa } from "@/contexts/ClientEmpresaContext";
 
 const mockCategories = [
   { id: "1", nome: "Estética Facial", icon: "✨", count: 8 },
@@ -16,6 +17,8 @@ const mockCategories = [
 
 export default function ClientHomePage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
+  const { empresa } = useClientEmpresa();
   const [search, setSearch] = useState("");
 
   const filtered = mockCategories.filter((c) =>
@@ -29,7 +32,7 @@ export default function ClientHomePage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-primary-foreground/70 text-sm">Bem-vindo(a) à</p>
-            <h1 className="text-xl font-bold text-primary-foreground">Clínica Beleza & Saúde</h1>
+            <h1 className="text-xl font-bold text-primary-foreground">{empresa?.nome || "Clínica"}</h1>
           </div>
           <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-foreground/20 flex items-center justify-center">
             <img src={logo} alt="Agend.me" className="h-8 w-8" />
@@ -54,7 +57,7 @@ export default function ClientHomePage() {
           {filtered.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => navigate(`/app/categoria/${cat.id}`)}
+              onClick={() => navigate(`/app/${slug}/categoria/${cat.id}`)}
               className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all text-left"
             >
               <span className="text-2xl">{cat.icon}</span>

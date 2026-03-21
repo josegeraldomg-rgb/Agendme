@@ -55,15 +55,15 @@ const App = () => (
             <Route path="/whatsapp" element={<WhatsAppPage />} />
             <Route path="/ausencias" element={<AusenciasPage />} />
           </Route>
-          {/* Client app routes */}
+          {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
-          <Route element={<ClientLayout />}>
-            <Route path="/app" element={<ClientHomePage />} />
-            <Route path="/app/categoria/:id" element={<ClientCategoryPage />} />
-            <Route path="/app/servico/:id" element={<ClientServiceDetailPage />} />
-            <Route path="/app/agendar" element={<ClientBookingFlowPage />} />
-            <Route path="/app/historico" element={<ClientHistoryPage />} />
-            <Route path="/app/perfil" element={<ClientProfilePage />} />
+          <Route path="/app/:slug" element={<ClientLayout />}>
+            <Route index element={<ClientHomePage />} />
+            <Route path="categoria/:id" element={<ClientCategoryPage />} />
+            <Route path="servico/:id" element={<ClientServiceDetailPage />} />
+            <Route path="agendar" element={<ClientBookingFlowPage />} />
+            <Route path="historico" element={<ClientHistoryPage />} />
+            <Route path="perfil" element={<ClientProfilePage />} />
           </Route>
           {/* SaaS Owner routes */}
           <Route path="/saas/login" element={<SaasLoginPage />} />

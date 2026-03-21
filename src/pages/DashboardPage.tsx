@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, DollarSign, Users, Clock, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 
 const chartData = [
   { name: "Seg", receita: 1200, despesa: 400 },
@@ -27,13 +28,15 @@ const statusColors: Record<string, string> = {
 };
 
 const DashboardPage = () => {
+  const { empresa } = useEmpresa();
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">Visão geral da sua clínica</p>
+          <p className="text-muted-foreground text-sm">Visão geral — {empresa?.nome}</p>
         </div>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />

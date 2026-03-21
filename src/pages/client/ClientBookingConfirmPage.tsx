@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Clock, Upload, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 
 export default function ClientBookingConfirmPage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const servicoId = searchParams.get("servico") || "";
   const dataStr = searchParams.get("data") || "";
@@ -40,7 +41,7 @@ export default function ClientBookingConfirmPage() {
     setTimeout(() => {
       setLoading(false);
       toast({ title: "Agendamento confirmado! ✅", description: "Você receberá uma confirmação por WhatsApp." });
-      navigate("/app/historico");
+      navigate(`/app/${slug}/historico`);
     }, 1500);
   };
 

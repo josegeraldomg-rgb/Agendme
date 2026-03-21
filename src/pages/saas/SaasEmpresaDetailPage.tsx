@@ -1,19 +1,19 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, Mail, Phone, CreditCard, CalendarDays } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Phone, CreditCard, CalendarDays, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-const empresas: Record<string, { nome: string; email: string; telefone: string; plano: string; status: string; proxima_cobranca: string; criado_em: string }> = {
-  e1: { nome: "Clínica Beleza Pura", email: "contato@belezapura.com", telefone: "(11) 3333-4444", plano: "Profissional", status: "ativa", proxima_cobranca: "25/03/2026", criado_em: "18/01/2026" },
-  e2: { nome: "Studio Ana Costa", email: "ana@studio.com", telefone: "(21) 2222-5555", plano: "Básico", status: "ativa", proxima_cobranca: "01/04/2026", criado_em: "10/02/2026" },
-  e3: { nome: "Estética Renovar", email: "admin@renovar.com", telefone: "(31) 8888-9999", plano: "Premium", status: "ativa", proxima_cobranca: "15/04/2026", criado_em: "12/03/2026" },
-  e4: { nome: "Espaço Zen", email: "contato@zen.com", telefone: "(11) 7777-1111", plano: "Básico", status: "inadimplente", proxima_cobranca: "10/03/2026", criado_em: "05/12/2025" },
-  e5: { nome: "Clínica Derma+", email: "adm@dermaplus.com", telefone: "(41) 6666-2222", plano: "Profissional", status: "ativa", proxima_cobranca: "20/04/2026", criado_em: "08/03/2026" },
-  e6: { nome: "BeautyCare", email: "info@beautycare.com", telefone: "(51) 5555-3333", plano: "Básico", status: "suspensa", proxima_cobranca: "—", criado_em: "20/08/2025" },
-  e7: { nome: "Clínica Vitalidade", email: "contato@vitalidade.com", telefone: "(11) 4444-6666", plano: "Premium", status: "ativa", proxima_cobranca: "28/03/2026", criado_em: "15/01/2026" },
-  e8: { nome: "Corpo e Mente", email: "admin@corpoemente.com", telefone: "(21) 9999-8888", plano: "Profissional", status: "inadimplente", proxima_cobranca: "05/03/2026", criado_em: "22/11/2025" },
+const empresas: Record<string, { nome: string; slug: string; email: string; telefone: string; plano: string; status: string; proxima_cobranca: string; criado_em: string }> = {
+  e1: { nome: "Clínica Beleza Pura", slug: "beleza-pura", email: "contato@belezapura.com", telefone: "(11) 3333-4444", plano: "Profissional", status: "ativa", proxima_cobranca: "25/03/2026", criado_em: "18/01/2026" },
+  e2: { nome: "Studio Ana Costa", slug: "studio-ana", email: "ana@studio.com", telefone: "(21) 2222-5555", plano: "Básico", status: "ativa", proxima_cobranca: "01/04/2026", criado_em: "10/02/2026" },
+  e3: { nome: "Estética Renovar", slug: "estetica-renovar", email: "admin@renovar.com", telefone: "(31) 8888-9999", plano: "Premium", status: "ativa", proxima_cobranca: "15/04/2026", criado_em: "12/03/2026" },
+  e4: { nome: "Espaço Zen", slug: "espaco-zen", email: "contato@zen.com", telefone: "(11) 7777-1111", plano: "Básico", status: "inadimplente", proxima_cobranca: "10/03/2026", criado_em: "05/12/2025" },
+  e5: { nome: "Clínica Derma+", slug: "derma-plus", email: "adm@dermaplus.com", telefone: "(41) 6666-2222", plano: "Profissional", status: "ativa", proxima_cobranca: "20/04/2026", criado_em: "08/03/2026" },
+  e6: { nome: "BeautyCare", slug: "beautycare", email: "info@beautycare.com", telefone: "(51) 5555-3333", plano: "Básico", status: "suspensa", proxima_cobranca: "—", criado_em: "20/08/2025" },
+  e7: { nome: "Clínica Vitalidade", slug: "vitalidade", email: "contato@vitalidade.com", telefone: "(11) 4444-6666", plano: "Premium", status: "ativa", proxima_cobranca: "28/03/2026", criado_em: "15/01/2026" },
+  e8: { nome: "Corpo e Mente", slug: "corpo-mente", email: "admin@corpoemente.com", telefone: "(21) 9999-8888", plano: "Profissional", status: "inadimplente", proxima_cobranca: "05/03/2026", criado_em: "22/11/2025" },
 };
 
 const statusStyle: Record<string, string> = {
@@ -96,6 +96,29 @@ export default function SaasEmpresaDetailPage() {
             </div>
           </div>
           <Button variant="outline" size="sm" className="rounded-xl text-xs">Alterar Plano</Button>
+        </div>
+      </div>
+
+      {/* Quick Access */}
+      <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Acesso Rápido</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            className="rounded-xl gap-2 justify-start"
+            onClick={() => navigate("/dashboard")}
+          >
+            <ExternalLink className="h-4 w-4 text-primary" />
+            Acessar Painel Admin
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-xl gap-2 justify-start"
+            onClick={() => window.open(`/app/${empresa.slug}`, "_blank")}
+          >
+            <ExternalLink className="h-4 w-4 text-primary" />
+            Ver App do Cliente
+          </Button>
         </div>
       </div>
 

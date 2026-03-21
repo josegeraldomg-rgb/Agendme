@@ -29,7 +29,7 @@ const categoryNames: Record<string, string> = {
 };
 
 export default function ClientCategoryPage() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const services = mockServices[id || ""] || [];
   const categoryName = categoryNames[id || ""] || "Categoria";
@@ -37,7 +37,7 @@ export default function ClientCategoryPage() {
   return (
     <div className="flex flex-col">
       <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/app")} className="h-9 w-9">
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/app/${slug}`)} className="h-9 w-9">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-base font-semibold text-foreground">{categoryName}</h1>
@@ -50,7 +50,7 @@ export default function ClientCategoryPage() {
         {services.map((service) => (
           <button
             key={service.id}
-            onClick={() => navigate(`/app/servico/${service.id}`)}
+            onClick={() => navigate(`/app/${slug}/servico/${service.id}`)}
             className="w-full bg-card rounded-xl border border-border p-4 text-left hover:border-primary/30 hover:shadow-sm transition-all"
           >
             <h3 className="font-medium text-foreground text-sm">{service.nome}</h3>
