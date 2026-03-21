@@ -85,7 +85,7 @@ const navGroups: NavGroup[] = [
 
 function SidebarGroup({ group, pathname, onNavigate }: { group: NavGroup; pathname: string; onNavigate: () => void }) {
   const isGroupActive = group.items.some((item) => pathname === item.to);
-  const [open, setOpen] = useState(isGroupActive || true);
+  const [open, setOpen] = useState<boolean>(true);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
