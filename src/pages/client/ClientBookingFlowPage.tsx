@@ -222,7 +222,7 @@ export default function ClientBookingFlowPage() {
 
   const handleBack = () => {
     if (currentIdx <= 0) {
-      navigate("/app");
+      navigate(`/app/${slug}`);
     } else {
       const prevStep = stepsOrder[currentIdx - 1];
       setStep(prevStep);
