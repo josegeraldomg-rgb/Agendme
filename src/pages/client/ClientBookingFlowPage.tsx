@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
+import { useAvailableSlots, isDateBlocked, getHolidayName } from "@/hooks/use-available-slots";
 
 // --- Mock Data ---
 const mockCategories = [
