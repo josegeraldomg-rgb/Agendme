@@ -11,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 
 export default function ClientBookingConfirmPage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const servicoId = searchParams.get("servico") || "";
   const dataStr = searchParams.get("data") || "";
