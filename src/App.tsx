@@ -47,8 +47,7 @@ const App = () => (
             <Route path="/app" element={<ClientHomePage />} />
             <Route path="/app/categoria/:id" element={<ClientCategoryPage />} />
             <Route path="/app/servico/:id" element={<ClientServiceDetailPage />} />
-            <Route path="/app/agendar" element={<ClientBookingDatePage />} />
-            <Route path="/app/agendar/confirmacao" element={<ClientBookingConfirmPage />} />
+            <Route path="/app/agendar" element={<ClientBookingFlowPage />} />
             <Route path="/app/historico" element={<ClientHistoryPage />} />
             <Route path="/app/perfil" element={<ClientProfilePage />} />
           </Route>
