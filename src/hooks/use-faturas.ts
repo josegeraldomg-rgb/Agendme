@@ -6,7 +6,7 @@ export function useFaturas(filters?: { status?: string }) {
     queryKey: ["faturas", filters],
     queryFn: async () => {
       let query = supabase.from("faturas").select("*, clientes(nome, email)").order("data_vencimento", { ascending: false });
-      if (filters?.status) query = query.eq("status", filters.status);
+      if (filters?.status) query = query.eq("status", filters.status as "pago" | "pendente" | "vencido");
       const { data, error } = await query;
       if (error) throw error;
       return data;
