@@ -74,7 +74,6 @@ const navGroups: NavGroup[] = [
     label: "Comunicação",
     items: [
       { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
-      { to: "/ausencias", label: "Ausências", icon: CalendarOff },
     ],
   },
   {
