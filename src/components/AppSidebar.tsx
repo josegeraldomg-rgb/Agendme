@@ -7,6 +7,7 @@ import {
   FileText,
   DollarSign,
   MessageCircle,
+  CalendarOff,
   Settings,
   Menu,
   X,
