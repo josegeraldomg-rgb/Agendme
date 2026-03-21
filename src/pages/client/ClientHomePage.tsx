@@ -57,7 +57,7 @@ export default function ClientHomePage() {
           {filtered.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => navigate(`/app/categoria/${cat.id}`)}
+              onClick={() => navigate(`/app/${slug}/categoria/${cat.id}`)}
               className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all text-left"
             >
               <span className="text-2xl">{cat.icon}</span>
