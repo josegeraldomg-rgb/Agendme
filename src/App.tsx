@@ -57,6 +57,7 @@ const App = () => (
             <Route path="/whatsapp" element={<WhatsAppPage />} />
             <Route path="/ausencias" element={<AusenciasPage />} />
             <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
+            <Route path="/notificacoes" element={<NotificacoesPage />} />
           </Route>
           {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
