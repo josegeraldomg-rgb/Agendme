@@ -59,6 +59,7 @@ const App = () => (
             <Route path="/ausencias" element={<AusenciasPage />} />
             <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
             <Route path="/notificacoes" element={<NotificacoesPage />} />
+            <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
           {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
