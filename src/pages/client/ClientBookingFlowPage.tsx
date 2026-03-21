@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, DollarSign, Star, Upload, X, MessageCircle, ChevronRight, Check, CreditCard, QrCode, Smartphone } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Star, Upload, X, MessageCircle, ChevronRight, Check, CreditCard, QrCode, Smartphone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
+import { useAvailableSlots, isDateBlocked, getHolidayName } from "@/hooks/use-available-slots";
 
 // --- Mock Data ---
 const mockCategories = [
@@ -56,9 +57,9 @@ const mockServices: Record<string, { id: string; nome: string; preco: number; du
 };
 
 const mockProfessionals = [
-  { id: "p1", nome: "Dra. Ana Silva", especialidade: "Dermatologista", rating: 4.9, avatar: "AS", slots: ["08:00", "08:30", "09:00", "10:00", "14:00", "15:00"] },
-  { id: "p2", nome: "Dr. Carlos Mendes", especialidade: "Esteticista", rating: 4.7, avatar: "CM", slots: ["09:00", "09:30", "10:30", "11:00", "14:30", "16:00"] },
-  { id: "p3", nome: "Dra. Mariana Costa", especialidade: "Fisioterapeuta", rating: 4.8, avatar: "MC", slots: ["08:00", "10:00", "11:00", "14:00", "15:30", "16:30"] },
+  { id: "p1", nome: "Dra. Ana Silva", especialidade: "Dermatologista", rating: 4.9, avatar: "AS" },
+  { id: "p2", nome: "Dr. Carlos Mendes", especialidade: "Esteticista", rating: 4.7, avatar: "CM" },
+  { id: "p3", nome: "Dra. Mariana Costa", especialidade: "Fisioterapeuta", rating: 4.8, avatar: "MC" },
 ];
 
 // Company config mock
@@ -351,7 +352,7 @@ export default function ClientBookingFlowPage() {
               selected={selectedDate}
               onSelect={handleSelectDate}
               locale={ptBR}
-              disabled={(date) => date < today || date > addDays(today, 60)}
+              disabled={(date) => date < today || date > addDays(today, 60) || isDateBlocked(date)}
               className={cn("p-0 pointer-events-auto rounded-xl border border-border bg-card w-full [&_.rdp-month]:w-full [&_.rdp-table]:w-full [&_.rdp-head_row]:flex [&_.rdp-head_row]:justify-around [&_.rdp-row]:flex [&_.rdp-row]:justify-around [&_.rdp-cell]:flex-1 [&_.rdp-cell]:flex [&_.rdp-cell]:justify-center [&_.rdp-day]:w-full [&_.rdp-day]:h-11 [&_.rdp-head_cell]:flex-1 [&_.rdp-head_cell]:text-center [&_.rdp-caption]:px-4 [&_.rdp-caption]:pt-3")}
             />
           </div>
@@ -365,37 +366,15 @@ export default function ClientBookingFlowPage() {
             </h2>
             <div className="space-y-4">
               {mockProfessionals.map((prof) => (
-                <div key={prof.id} className="bg-card rounded-xl border border-border p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-primary font-bold text-sm">{prof.avatar}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{prof.nome}</p>
-                      <p className="text-xs text-muted-foreground">{prof.especialidade}</p>
-                    </div>
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                      <span className="text-xs font-medium text-foreground">{prof.rating}</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {prof.slots.map((time) => (
-                      <button
-                        key={`${prof.id}-${time}`}
-                        onClick={() => handleSelectTimeSlot(prof, time)}
-                        className={cn(
-                          "py-2 rounded-lg text-sm font-medium border transition-all",
-                          selectedProfessional?.id === prof.id && selectedTime === time
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-primary/40"
-                        )}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <ProfessionalSlotCard
+                  key={prof.id}
+                  prof={prof}
+                  date={selectedDate}
+                  duracaoServico={selectedService?.duracao || 30}
+                  selectedProfessional={selectedProfessional}
+                  selectedTime={selectedTime}
+                  onSelectTimeSlot={handleSelectTimeSlot}
+                />
               ))}
             </div>
           </div>
@@ -592,6 +571,66 @@ export default function ClientBookingFlowPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Sub-component: uses the scheduling engine hook ──
+function ProfessionalSlotCard({
+  prof,
+  date,
+  duracaoServico,
+  selectedProfessional,
+  selectedTime,
+  onSelectTimeSlot,
+}: {
+  prof: { id: string; nome: string; especialidade: string; rating: number; avatar: string };
+  date: Date;
+  duracaoServico: number;
+  selectedProfessional: { id: string } | null;
+  selectedTime: string;
+  onSelectTimeSlot: (prof: any, time: string) => void;
+}) {
+  const availableSlots = useAvailableSlots(prof.id, date, duracaoServico);
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <span className="text-primary font-bold text-sm">{prof.avatar}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">{prof.nome}</p>
+          <p className="text-xs text-muted-foreground">{prof.especialidade}</p>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+          <span className="text-xs font-medium text-foreground">{prof.rating}</span>
+        </div>
+      </div>
+      {availableSlots.length > 0 ? (
+        <div className="grid grid-cols-4 gap-2">
+          {availableSlots.map((time) => (
+            <button
+              key={`${prof.id}-${time}`}
+              onClick={() => onSelectTimeSlot(prof, time)}
+              className={cn(
+                "py-2 rounded-lg text-sm font-medium border transition-all",
+                selectedProfessional?.id === prof.id && selectedTime === time
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-foreground border-border hover:border-primary/40"
+              )}
+            >
+              {time}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-muted-foreground text-xs py-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>Sem horários disponíveis nesta data</span>
+        </div>
+      )}
     </div>
   );
 }

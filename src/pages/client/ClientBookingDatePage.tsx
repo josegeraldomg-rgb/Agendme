@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-const mockTimeSlots = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "14:00", "14:30", "15:00", "15:30", "16:00"];
+import { useAvailableSlots, isDateBlocked } from "@/hooks/use-available-slots";
 
 export default function ClientBookingDatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const servicoId = searchParams.get("servico") || "";
+  const profissionalId = searchParams.get("profissional") || "p1";
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string>("");
+
+  const availableSlots = useAvailableSlots(profissionalId, selectedDate);
 
   const handleContinue = () => {
     if (selectedDate && selectedTime) {
@@ -38,9 +40,9 @@ export default function ClientBookingDatePage() {
         <Calendar
           mode="single"
           selected={selectedDate}
-          onSelect={setSelectedDate}
+          onSelect={(d) => { setSelectedDate(d); setSelectedTime(""); }}
           locale={ptBR}
-          disabled={(date) => date < today || date > addDays(today, 60)}
+          disabled={(date) => date < today || date > addDays(today, 60) || isDateBlocked(date)}
           className={cn("p-3 pointer-events-auto rounded-xl border border-border bg-card mx-auto")}
         />
 
@@ -49,22 +51,29 @@ export default function ClientBookingDatePage() {
             <h2 className="text-sm font-semibold text-foreground mb-3">
               Horários disponíveis — {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
             </h2>
-            <div className="grid grid-cols-4 gap-2">
-              {mockTimeSlots.map((time) => (
-                <button
-                  key={time}
-                  onClick={() => setSelectedTime(time)}
-                  className={cn(
-                    "py-2.5 rounded-lg text-sm font-medium border transition-all",
-                    selectedTime === time
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card text-foreground border-border hover:border-primary/30"
-                  )}
-                >
-                  {time}
-                </button>
-              ))}
-            </div>
+            {availableSlots.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {availableSlots.map((time) => (
+                  <button
+                    key={time}
+                    onClick={() => setSelectedTime(time)}
+                    className={cn(
+                      "py-2.5 rounded-lg text-sm font-medium border transition-all",
+                      selectedTime === time
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-foreground border-border hover:border-primary/30"
+                    )}
+                  >
+                    {time}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm py-4 justify-center">
+                <AlertCircle className="h-4 w-4" />
+                <span>Sem horários disponíveis nesta data</span>
+              </div>
+            )}
           </div>
         )}
 
