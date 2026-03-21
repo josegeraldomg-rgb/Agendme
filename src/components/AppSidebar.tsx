@@ -222,12 +222,12 @@ export function AppSidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-sidebar-border p-3">
+        <div className="border-t border-sidebar-border p-2">
           <NavLink
             to="/configuracoes"
             onClick={closeMobile}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               location.pathname === "/configuracoes"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
@@ -236,7 +236,7 @@ export function AppSidebar() {
             <Settings className={cn("h-4.5 w-4.5", location.pathname === "/configuracoes" ? "text-primary" : "text-sidebar-muted")} />
             Configurações
           </NavLink>
-          <div className="mt-3 px-3">
+          <div className="mt-2 px-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
                 <span className="text-xs font-semibold text-sidebar-accent-foreground">AD</span>
