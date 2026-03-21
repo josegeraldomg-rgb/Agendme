@@ -17,6 +17,7 @@ import NotificacoesPage from "./pages/NotificacoesPage";
 import ConfiguracoesPage from "./pages/ConfiguracoesPage";
 import TeleconsultaPage from "./pages/TeleconsultaPage";
 import RelatoriosPage from "./pages/RelatoriosPage";
+import BackupAuditoriaPage from "./pages/BackupAuditoriaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
