@@ -7,6 +7,7 @@ import {
   DollarSign,
   ScrollText,
   ShieldCheck,
+  Database,
   Menu,
   X,
   LogOut,
@@ -23,6 +24,7 @@ const navItems = [
   { to: "/saas/pagamentos", label: "Pagamentos", icon: DollarSign },
   { to: "/saas/logs", label: "Logs", icon: ScrollText },
   { to: "/saas/permissoes", label: "Permissões", icon: ShieldCheck },
+  { to: "/saas/backup", label: "Backup & Auditoria", icon: Database },
 ];
 
 export function SaasSidebar() {

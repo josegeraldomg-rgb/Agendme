@@ -17,6 +17,7 @@ import NotificacoesPage from "./pages/NotificacoesPage";
 import ConfiguracoesPage from "./pages/ConfiguracoesPage";
 import TeleconsultaPage from "./pages/TeleconsultaPage";
 import RelatoriosPage from "./pages/RelatoriosPage";
+import BackupAuditoriaPage from "./pages/BackupAuditoriaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/saas/pagamentos" element={<SaasPagamentosPage />} />
             <Route path="/saas/logs" element={<SaasLogsPage />} />
             <Route path="/saas/permissoes" element={<SaasPermissoesPage />} />
+            <Route path="/saas/backup" element={<BackupAuditoriaPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
