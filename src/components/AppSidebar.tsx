@@ -243,14 +243,16 @@ export function AppSidebar() {
           <div className="mt-2 px-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <span className="text-xs font-semibold text-sidebar-accent-foreground">AD</span>
+                <span className="text-xs font-semibold text-sidebar-accent-foreground">
+                  {profile?.nome ? profile.nome.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "U"}
+                </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-accent-foreground truncate">Admin</p>
-                <p className="text-xs text-sidebar-muted truncate">admin@clinica.com</p>
+                <p className="text-sm font-medium text-sidebar-accent-foreground truncate">{profile?.nome || "Usuário"}</p>
+                <p className="text-xs text-sidebar-muted truncate">{profile?.email || ""}</p>
               </div>
               <button
-                onClick={() => navigate("/saas/login")}
+                onClick={async () => { await signOut(); navigate("/login"); }}
                 className="text-sidebar-muted hover:text-sidebar-foreground transition-colors"
                 title="Sair"
               >
