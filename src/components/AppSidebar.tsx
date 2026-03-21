@@ -7,6 +7,7 @@ import {
   FileText,
   DollarSign,
   MessageCircle,
+  CalendarOff,
   Settings,
   Menu,
   X,
@@ -23,6 +24,7 @@ const navItems = [
   { to: "/prontuario", label: "Prontuário", icon: FileText },
   { to: "/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { to: "/ausencias", label: "Ausências", icon: CalendarOff },
 ];
 
 export function AppSidebar() {
