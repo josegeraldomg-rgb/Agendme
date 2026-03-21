@@ -126,6 +126,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { empresa, empresas, switchEmpresa } = useEmpresa();
+  const { profile, signOut } = useAuth();
 
   const closeMobile = () => setMobileOpen(false);
 
