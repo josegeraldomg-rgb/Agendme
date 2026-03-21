@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calendar,
@@ -12,10 +12,22 @@ import {
   Settings,
   Menu,
   X,
+  ChevronsUpDown,
+  Building2,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import logo from "@/assets/logo-agendme.png";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -32,6 +44,8 @@ const navItems = [
 export function AppSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { empresa, empresas, switchEmpresa } = useEmpresa();
 
   return (
     <>
@@ -58,13 +72,60 @@ export function AppSidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Header */}
-        <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Agend.me" className="h-8 w-8" />
-            <span className="text-lg font-bold text-sidebar-accent-foreground">Agend.me</span>
-          </div>
-          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-sidebar-muted">
+        {/* Header — Empresa selector */}
+        <div className="flex h-auto items-center justify-between px-4 py-3 border-b border-sidebar-border">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2.5 w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/60 transition-colors text-left">
+                <div className="h-9 w-9 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                  <Building2 className="h-4.5 w-4.5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-sidebar-accent-foreground truncate">
+                    {empresa?.nome || "Selecionar Empresa"}
+                  </p>
+                  <p className="text-[10px] text-sidebar-muted truncate">
+                    Plano {empresa?.plano}
+                  </p>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 text-sidebar-muted shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Trocar Empresa</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {empresas.map((emp) => (
+                <DropdownMenuItem
+                  key={emp.id}
+                  onClick={() => switchEmpresa(emp.id)}
+                  className={cn(
+                    "gap-2 cursor-pointer",
+                    empresa?.id === emp.id && "bg-accent"
+                  )}
+                >
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{emp.nome}</p>
+                    <p className="text-[10px] text-muted-foreground">{emp.plano}</p>
+                  </div>
+                  {emp.status !== "ativa" && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning capitalize">
+                      {emp.status}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => navigate("/saas/dashboard")}
+                className="gap-2 cursor-pointer text-muted-foreground"
+              >
+                <img src={logo} alt="Agend.me" className="h-4 w-4" />
+                <span className="text-xs">Painel SaaS</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-sidebar-muted ml-1">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -111,6 +172,13 @@ export function AppSidebar() {
                 <p className="text-sm font-medium text-sidebar-accent-foreground truncate">Admin</p>
                 <p className="text-xs text-sidebar-muted truncate">admin@clinica.com</p>
               </div>
+              <button
+                onClick={() => navigate("/saas/login")}
+                className="text-sidebar-muted hover:text-sidebar-foreground transition-colors"
+                title="Sair"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
