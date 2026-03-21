@@ -161,7 +161,7 @@ export default function ClientBookingFlowPage() {
     setTimeout(() => {
       setLoading(false);
       toast({ title: "Agendamento confirmado! ✅", description: "Você receberá uma confirmação por WhatsApp." });
-      navigate("/app/historico");
+      navigate(`/app/${slug}/historico`);
     }, 1500);
   };
 
