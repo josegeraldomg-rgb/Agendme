@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ClientLayout } from "@/components/ClientLayout";
+import { SaasLayout } from "@/components/SaasLayout";
 import DashboardPage from "./pages/DashboardPage";
 import AgendaPage from "./pages/AgendaPage";
 import PacientesPage from "./pages/PacientesPage";
@@ -19,6 +20,15 @@ import ClientBookingFlowPage from "./pages/client/ClientBookingFlowPage";
 import ClientHistoryPage from "./pages/client/ClientHistoryPage";
 import ClientProfilePage from "./pages/client/ClientProfilePage";
 import ClientLoginPage from "./pages/client/ClientLoginPage";
+import SaasLoginPage from "./pages/saas/SaasLoginPage";
+import SaasDashboardPage from "./pages/saas/SaasDashboardPage";
+import SaasPlanosPage from "./pages/saas/SaasPlanosPage";
+import SaasEmpresasPage from "./pages/saas/SaasEmpresasPage";
+import SaasEmpresaDetailPage from "./pages/saas/SaasEmpresaDetailPage";
+import SaasAssinaturasPage from "./pages/saas/SaasAssinaturasPage";
+import SaasPagamentosPage from "./pages/saas/SaasPagamentosPage";
+import SaasLogsPage from "./pages/saas/SaasLogsPage";
+import SaasPermissoesPage from "./pages/saas/SaasPermissoesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +60,18 @@ const App = () => (
             <Route path="/app/agendar" element={<ClientBookingFlowPage />} />
             <Route path="/app/historico" element={<ClientHistoryPage />} />
             <Route path="/app/perfil" element={<ClientProfilePage />} />
+          </Route>
+          {/* SaaS Owner routes */}
+          <Route path="/saas/login" element={<SaasLoginPage />} />
+          <Route element={<SaasLayout />}>
+            <Route path="/saas/dashboard" element={<SaasDashboardPage />} />
+            <Route path="/saas/planos" element={<SaasPlanosPage />} />
+            <Route path="/saas/empresas" element={<SaasEmpresasPage />} />
+            <Route path="/saas/empresa/:id" element={<SaasEmpresaDetailPage />} />
+            <Route path="/saas/assinaturas" element={<SaasAssinaturasPage />} />
+            <Route path="/saas/pagamentos" element={<SaasPagamentosPage />} />
+            <Route path="/saas/logs" element={<SaasLogsPage />} />
+            <Route path="/saas/permissoes" element={<SaasPermissoesPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
