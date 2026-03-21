@@ -17,6 +17,8 @@ const mockCategories = [
 
 export default function ClientHomePage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
+  const { empresa } = useClientEmpresa();
   const [search, setSearch] = useState("");
 
   const filtered = mockCategories.filter((c) =>
