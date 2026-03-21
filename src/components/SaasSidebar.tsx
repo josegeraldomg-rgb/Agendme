@@ -8,6 +8,7 @@ import {
   ScrollText,
   ShieldCheck,
   Database,
+  Zap,
   Menu,
   X,
   LogOut,
