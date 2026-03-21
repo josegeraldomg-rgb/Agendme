@@ -18,6 +18,7 @@ import ConfiguracoesPage from "./pages/ConfiguracoesPage";
 import TeleconsultaPage from "./pages/TeleconsultaPage";
 import RelatoriosPage from "./pages/RelatoriosPage";
 import BackupAuditoriaPage from "./pages/BackupAuditoriaPage";
+import SaasCachePage from "./pages/saas/SaasCachePage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
