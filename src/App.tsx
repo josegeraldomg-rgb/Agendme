@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ClientLayout } from "@/components/ClientLayout";
 import { SaasLayout } from "@/components/SaasLayout";
 import DashboardPage from "./pages/DashboardPage";
+import HorariosPage from "./pages/HorariosPage";
 import AgendaPage from "./pages/AgendaPage";
 import PacientesPage from "./pages/PacientesPage";
 import ServicosPage from "./pages/ServicosPage";
