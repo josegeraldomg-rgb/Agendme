@@ -295,7 +295,7 @@ function WhatsAppTemplates() {
 
   const renderPreview = (msg: string) => {
     let rendered = msg;
-    Object.entries(previewValores).forEach(([k, v]) => { rendered = rendered.replaceAll(k, v); });
+    Object.entries(previewValores).forEach(([k, v]) => { rendered = rendered.split(k).join(v); });
     return rendered;
   };
 
