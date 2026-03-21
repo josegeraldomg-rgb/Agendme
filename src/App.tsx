@@ -61,6 +61,7 @@ const App = () => (
             <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
             <Route path="/notificacoes" element={<NotificacoesPage />} />
             <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+            <Route path="/teleconsulta" element={<TeleconsultaPage />} />
           </Route>
           {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
