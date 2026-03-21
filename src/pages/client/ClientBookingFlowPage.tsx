@@ -352,7 +352,7 @@ export default function ClientBookingFlowPage() {
               selected={selectedDate}
               onSelect={handleSelectDate}
               locale={ptBR}
-              disabled={(date) => date < today || date > addDays(today, 60)}
+              disabled={(date) => date < today || date > addDays(today, 60) || isDateBlocked(date)}
               className={cn("p-0 pointer-events-auto rounded-xl border border-border bg-card w-full [&_.rdp-month]:w-full [&_.rdp-table]:w-full [&_.rdp-head_row]:flex [&_.rdp-head_row]:justify-around [&_.rdp-row]:flex [&_.rdp-row]:justify-around [&_.rdp-cell]:flex-1 [&_.rdp-cell]:flex [&_.rdp-cell]:justify-center [&_.rdp-day]:w-full [&_.rdp-day]:h-11 [&_.rdp-head_cell]:flex-1 [&_.rdp-head_cell]:text-center [&_.rdp-caption]:px-4 [&_.rdp-caption]:pt-3")}
             />
           </div>
