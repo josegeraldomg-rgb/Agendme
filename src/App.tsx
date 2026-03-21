@@ -15,6 +15,7 @@ import ProntuarioPage from "./pages/ProntuarioPage";
 import UsuariosPermissoesPage from "./pages/UsuariosPermissoesPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
 import ConfiguracoesPage from "./pages/ConfiguracoesPage";
+import TeleconsultaPage from "./pages/TeleconsultaPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
