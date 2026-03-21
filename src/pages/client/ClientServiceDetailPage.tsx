@@ -29,7 +29,7 @@ export default function ClientServiceDetailPage() {
     return (
       <div className="p-6 text-center text-muted-foreground">
         <p>Serviço não encontrado.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/app")}>Voltar</Button>
+        <Button variant="outline" className="mt-4" onClick={() => navigate(`/app/${slug}`)}>Voltar</Button>
       </div>
     );
   }
