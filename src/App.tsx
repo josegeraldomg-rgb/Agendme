@@ -13,6 +13,7 @@ import PacientesPage from "./pages/PacientesPage";
 import ServicosPage from "./pages/ServicosPage";
 import ProntuarioPage from "./pages/ProntuarioPage";
 import UsuariosPermissoesPage from "./pages/UsuariosPermissoesPage";
+import NotificacoesPage from "./pages/NotificacoesPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
