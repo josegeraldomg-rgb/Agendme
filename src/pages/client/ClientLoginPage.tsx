@@ -3,31 +3,51 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo-agendme.png";
 
 export default function ClientLoginPage() {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !senha) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
-    toast({ title: isLogin ? "Login realizado!" : "Conta criada com sucesso!" });
-    navigate("/app");
+    setLoading(true);
+    if (isLogin) {
+      const { error } = await signIn(email, senha);
+      setLoading(false);
+      if (error) {
+        toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Login realizado!" });
+        navigate("/app");
+      }
+    } else {
+      const { error } = await signUp(email, senha, { nome, telefone });
+      setLoading(false);
+      if (error) {
+        toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
+        setIsLogin(true);
+      }
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
       <div className="w-full max-w-sm space-y-6">
-        {/* Logo */}
         <div className="text-center">
           <img src={logo} alt="Agend.me" className="h-14 w-14 mx-auto mb-3" />
           <h1 className="text-xl font-bold text-foreground">Agend.me</h1>
@@ -57,9 +77,8 @@ export default function ClientLoginPage() {
             <Label className="text-sm">Senha</Label>
             <Input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" placeholder="••••••••" className="mt-1 h-11 rounded-xl" />
           </div>
-
-          <Button type="submit" className="w-full h-12 rounded-xl text-sm font-semibold">
-            {isLogin ? "Entrar" : "Criar Conta"}
+          <Button type="submit" className="w-full h-12 rounded-xl text-sm font-semibold" disabled={loading}>
+            {loading ? "Aguarde..." : isLogin ? "Entrar" : "Criar Conta"}
           </Button>
         </form>
 

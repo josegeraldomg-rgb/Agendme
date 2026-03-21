@@ -3,26 +3,31 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo-agendme.png";
 
 export default function SaasLoginPage() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !senha.trim()) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    const { error } = await signIn(email, senha);
+    setLoading(false);
+    if (error) {
+      toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+    } else {
       toast({ title: "Login realizado com sucesso!" });
       navigate("/saas/dashboard");
-    }, 1000);
+    }
   };
 
   return (
@@ -33,7 +38,6 @@ export default function SaasLoginPage() {
           <h1 className="text-2xl font-bold text-foreground">Agend.me</h1>
           <p className="text-sm text-muted-foreground mt-1">Painel do Administrador SaaS</p>
         </div>
-
         <div className="bg-card rounded-2xl border border-border p-6 space-y-4 shadow-sm">
           <div>
             <Label className="text-sm">Email</Label>
