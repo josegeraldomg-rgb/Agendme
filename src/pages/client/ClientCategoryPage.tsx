@@ -29,7 +29,7 @@ const categoryNames: Record<string, string> = {
 };
 
 export default function ClientCategoryPage() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const services = mockServices[id || ""] || [];
   const categoryName = categoryNames[id || ""] || "Categoria";
