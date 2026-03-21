@@ -15,6 +15,7 @@ import {
   ChevronsUpDown,
   Building2,
   LogOut,
+  Shield,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ const navItems = [
   { to: "/financeiro", label: "Financeiro", icon: DollarSign },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/ausencias", label: "Ausências", icon: CalendarOff },
+  { to: "/usuarios", label: "Permissões", icon: Shield },
 ];
 
 export function AppSidebar() {
