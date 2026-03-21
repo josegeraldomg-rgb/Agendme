@@ -14,6 +14,7 @@ import ServicosPage from "./pages/ServicosPage";
 import ProntuarioPage from "./pages/ProntuarioPage";
 import UsuariosPermissoesPage from "./pages/UsuariosPermissoesPage";
 import NotificacoesPage from "./pages/NotificacoesPage";
+import ConfiguracoesPage from "./pages/ConfiguracoesPage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/ausencias" element={<AusenciasPage />} />
             <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
             <Route path="/notificacoes" element={<NotificacoesPage />} />
+            <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           </Route>
           {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
