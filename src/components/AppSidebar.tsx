@@ -18,6 +18,7 @@ import {
   Shield,
   Video,
   BarChart3,
+  ChevronDown,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -31,27 +32,99 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/agenda", label: "Agenda", icon: Calendar },
-  { to: "/horarios", label: "Horários", icon: Clock },
-  { to: "/pacientes", label: "Pacientes", icon: Users },
-  { to: "/servicos", label: "Serviços", icon: Briefcase },
-  { to: "/prontuario", label: "Prontuário", icon: FileText },
-  { to: "/financeiro", label: "Financeiro", icon: DollarSign },
-  { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { to: "/ausencias", label: "Ausências", icon: CalendarOff },
-  { to: "/usuarios", label: "Permissões", icon: Shield },
-  { to: "/teleconsulta", label: "Teleconsulta", icon: Video },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+interface NavGroup {
+  label: string;
+  items: { to: string; label: string; icon: React.ElementType }[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: "Principal",
+    items: [
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/agenda", label: "Agenda", icon: Calendar },
+      { to: "/horarios", label: "Horários", icon: Clock },
+    ],
+  },
+  {
+    label: "Clínica",
+    items: [
+      { to: "/pacientes", label: "Pacientes", icon: Users },
+      { to: "/servicos", label: "Serviços", icon: Briefcase },
+      { to: "/prontuario", label: "Prontuário", icon: FileText },
+      { to: "/teleconsulta", label: "Teleconsulta", icon: Video },
+    ],
+  },
+  {
+    label: "Financeiro",
+    items: [
+      { to: "/financeiro", label: "Financeiro", icon: DollarSign },
+      { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Comunicação",
+    items: [
+      { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { to: "/ausencias", label: "Ausências", icon: CalendarOff },
+    ],
+  },
+  {
+    label: "Administração",
+    items: [
+      { to: "/usuarios", label: "Permissões", icon: Shield },
+    ],
+  },
 ];
+
+function SidebarGroup({ group, pathname, onNavigate }: { group: NavGroup; pathname: string; onNavigate: () => void }) {
+  const isGroupActive = group.items.some((item) => pathname === item.to);
+  const [open, setOpen] = useState<boolean>(true);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted hover:text-sidebar-foreground transition-colors">
+        {group.label}
+        <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-180")} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-0.5 pb-2">
+        {group.items.map((item) => {
+          const isActive = pathname === item.to;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <item.icon className={cn("h-4.5 w-4.5", isActive ? "text-primary" : "text-sidebar-muted")} />
+              {item.label}
+            </NavLink>
+          );
+        })}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export function AppSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { empresa, empresas, switchEmpresa } = useEmpresa();
+
+  const closeMobile = () => setMobileOpen(false);
 
   return (
     <>
@@ -67,7 +140,7 @@ export function AppSidebar() {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-foreground/30 lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          onClick={closeMobile}
         />
       )}
 
@@ -131,42 +204,36 @@ export function AppSidebar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-sidebar-muted ml-1">
+          <button onClick={closeMobile} className="lg:hidden text-sidebar-muted ml-1">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-sidebar-muted")} />
-                {item.label}
-              </NavLink>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+          {navGroups.map((group) => (
+            <SidebarGroup
+              key={group.label}
+              group={group}
+              pathname={location.pathname}
+              onNavigate={closeMobile}
+            />
+          ))}
         </nav>
 
         {/* Footer */}
         <div className="border-t border-sidebar-border p-3">
           <NavLink
             to="/configuracoes"
-            onClick={() => setMobileOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground transition-colors"
+            onClick={closeMobile}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              location.pathname === "/configuracoes"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+            )}
           >
-            <Settings className="h-5 w-5 text-sidebar-muted" />
+            <Settings className={cn("h-4.5 w-4.5", location.pathname === "/configuracoes" ? "text-primary" : "text-sidebar-muted")} />
             Configurações
           </NavLink>
           <div className="mt-3 px-3">
