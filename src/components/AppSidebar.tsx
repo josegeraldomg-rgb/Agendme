@@ -89,11 +89,11 @@ function SidebarGroup({ group, pathname, onNavigate }: { group: NavGroup; pathna
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted hover:text-sidebar-foreground transition-colors">
+      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted hover:text-sidebar-foreground transition-colors">
         {group.label}
         <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-180")} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-0.5 pb-2">
+      <CollapsibleContent className="space-y-0.5 pb-1">
         {group.items.map((item) => {
           const isActive = pathname === item.to;
           return (
@@ -102,7 +102,7 @@ function SidebarGroup({ group, pathname, onNavigate }: { group: NavGroup; pathna
               to={item.to}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
@@ -210,7 +210,7 @@ export function AppSidebar() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-0.5">
           {navGroups.map((group) => (
             <SidebarGroup
               key={group.label}
@@ -222,12 +222,12 @@ export function AppSidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-sidebar-border p-3">
+        <div className="border-t border-sidebar-border p-2">
           <NavLink
             to="/configuracoes"
             onClick={closeMobile}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               location.pathname === "/configuracoes"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
@@ -236,7 +236,7 @@ export function AppSidebar() {
             <Settings className={cn("h-4.5 w-4.5", location.pathname === "/configuracoes" ? "text-primary" : "text-sidebar-muted")} />
             Configurações
           </NavLink>
-          <div className="mt-3 px-3">
+          <div className="mt-2 px-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
                 <span className="text-xs font-semibold text-sidebar-accent-foreground">AD</span>
