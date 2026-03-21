@@ -93,7 +93,7 @@ function SidebarGroup({ group, pathname, onNavigate }: { group: NavGroup; pathna
         {group.label}
         <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-180")} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-0.5 pb-2">
+      <CollapsibleContent className="space-y-0.5 pb-1">
         {group.items.map((item) => {
           const isActive = pathname === item.to;
           return (
