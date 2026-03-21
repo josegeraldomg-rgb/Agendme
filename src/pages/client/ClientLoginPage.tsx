@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import logo from "@/assets/logo-agendme.png";
 
 export default function ClientLoginPage() {
   const navigate = useNavigate();
