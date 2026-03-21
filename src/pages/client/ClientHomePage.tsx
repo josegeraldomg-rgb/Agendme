@@ -32,7 +32,7 @@ export default function ClientHomePage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-primary-foreground/70 text-sm">Bem-vindo(a) à</p>
-            <h1 className="text-xl font-bold text-primary-foreground">Clínica Beleza & Saúde</h1>
+            <h1 className="text-xl font-bold text-primary-foreground">{empresa?.nome || "Clínica"}</h1>
           </div>
           <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-foreground/20 flex items-center justify-center">
             <img src={logo} alt="Agend.me" className="h-8 w-8" />
