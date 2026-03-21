@@ -19,6 +19,7 @@ import {
   Video,
   BarChart3,
   ChevronDown,
+  Webhook,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,7 @@ const navGroups: NavGroup[] = [
     label: "Administração",
     items: [
       { to: "/usuarios", label: "Permissões", icon: Shield },
+      { to: "/webhooks", label: "Webhooks", icon: Webhook },
     ],
   },
 ];

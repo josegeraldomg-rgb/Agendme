@@ -22,6 +22,7 @@ import SaasCachePage from "./pages/saas/SaasCachePage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
+import WebhooksPage from "./pages/WebhooksPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
 import ClientCategoryPage from "./pages/client/ClientCategoryPage";
 import ClientServiceDetailPage from "./pages/client/ClientServiceDetailPage";
@@ -66,6 +67,7 @@ const App = () => (
             <Route path="/configuracoes" element={<ConfiguracoesPage />} />
             <Route path="/teleconsulta" element={<TeleconsultaPage />} />
             <Route path="/relatorios" element={<RelatoriosPage />} />
+            <Route path="/webhooks" element={<WebhooksPage />} />
           </Route>
           {/* Client app routes — scoped by empresa slug */}
           <Route path="/app/login" element={<ClientLoginPage />} />
