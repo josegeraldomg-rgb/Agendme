@@ -574,3 +574,63 @@ export default function ClientBookingFlowPage() {
     </div>
   );
 }
+
+// ── Sub-component: uses the scheduling engine hook ──
+function ProfessionalSlotCard({
+  prof,
+  date,
+  duracaoServico,
+  selectedProfessional,
+  selectedTime,
+  onSelectTimeSlot,
+}: {
+  prof: { id: string; nome: string; especialidade: string; rating: number; avatar: string };
+  date: Date;
+  duracaoServico: number;
+  selectedProfessional: { id: string } | null;
+  selectedTime: string;
+  onSelectTimeSlot: (prof: any, time: string) => void;
+}) {
+  const availableSlots = useAvailableSlots(prof.id, date, duracaoServico);
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <span className="text-primary font-bold text-sm">{prof.avatar}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">{prof.nome}</p>
+          <p className="text-xs text-muted-foreground">{prof.especialidade}</p>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+          <span className="text-xs font-medium text-foreground">{prof.rating}</span>
+        </div>
+      </div>
+      {availableSlots.length > 0 ? (
+        <div className="grid grid-cols-4 gap-2">
+          {availableSlots.map((time) => (
+            <button
+              key={`${prof.id}-${time}`}
+              onClick={() => onSelectTimeSlot(prof, time)}
+              className={cn(
+                "py-2 rounded-lg text-sm font-medium border transition-all",
+                selectedProfessional?.id === prof.id && selectedTime === time
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-foreground border-border hover:border-primary/40"
+              )}
+            >
+              {time}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-muted-foreground text-xs py-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>Sem horários disponíveis nesta data</span>
+        </div>
+      )}
+    </div>
+  );
+}
