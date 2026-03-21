@@ -8,6 +8,7 @@ import {
   DollarSign,
   MessageCircle,
   CalendarOff,
+  Clock,
   Settings,
   Menu,
   X,
@@ -19,6 +20,7 @@ import logo from "@/assets/logo-agendme.png";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/agenda", label: "Agenda", icon: Calendar },
+  { to: "/horarios", label: "Horários", icon: Clock },
   { to: "/pacientes", label: "Pacientes", icon: Users },
   { to: "/servicos", label: "Serviços", icon: Briefcase },
   { to: "/prontuario", label: "Prontuário", icon: FileText },
