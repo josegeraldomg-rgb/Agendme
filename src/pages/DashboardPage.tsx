@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar, DollarSign, Users, Clock, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useEmpresa } from "@/contexts/EmpresaContext";
+import { useDashboardStats } from "@/hooks/use-faturas";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAgendamentos } from "@/hooks/use-agendamentos";
+import { format } from "date-fns";
 
 const chartData = [
   { name: "Seg", receita: 1200, despesa: 400 },
@@ -13,29 +17,17 @@ const chartData = [
   { name: "Sáb", receita: 800, despesa: 200 },
 ];
 
-const proximosAtendimentos = [
-  { hora: "09:00", paciente: "Maria Silva", servico: "Consulta", profissional: "Dr. João", status: "confirmado" },
-  { hora: "10:00", paciente: "Carlos Souza", servico: "Retorno", profissional: "Dr. João", status: "pendente" },
-  { hora: "11:30", paciente: "Ana Oliveira", servico: "Avaliação", profissional: "Dra. Paula", status: "confirmado" },
-  { hora: "14:00", paciente: "Pedro Santos", servico: "Fisioterapia", profissional: "Dr. Ricardo", status: "pendente" },
-  { hora: "15:30", paciente: "Lucia Mendes", servico: "Consulta", profissional: "Dra. Paula", status: "confirmado" },
-];
-
-const statusColors: Record<string, string> = {
-  confirmado: "bg-success/15 text-success",
-  pendente: "bg-warning/15 text-warning",
-  cancelado: "bg-destructive/15 text-destructive",
-};
-
 const DashboardPage = () => {
   const { empresa } = useEmpresa();
+  const { data: stats, isLoading } = useDashboardStats();
+  const today = format(new Date(), "yyyy-MM-dd");
+  const { data: agendamentosHoje } = useAgendamentos({ data_aula: today });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">Página Inicial</h1>
           <p className="text-muted-foreground text-sm">Visão geral — {empresa?.nome}</p>
         </div>
         <Button className="gap-2">
@@ -51,10 +43,9 @@ const DashboardPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Agendamentos Hoje</p>
-                <p className="text-2xl font-bold text-foreground mt-1">12</p>
-                <p className="text-xs text-success flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" /> +8% vs ontem
-                </p>
+                {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : (
+                  <p className="text-2xl font-bold text-foreground mt-1">{agendamentosHoje?.length || 0}</p>
+                )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-accent flex items-center justify-center">
                 <Calendar className="h-5 w-5 text-accent-foreground" />
@@ -67,11 +58,12 @@ const DashboardPage = () => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Receita do Dia</p>
-                <p className="text-2xl font-bold text-foreground mt-1">R$ 3.450</p>
-                <p className="text-xs text-success flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" /> +12% vs ontem
-                </p>
+                <p className="text-sm text-muted-foreground">Receita Total</p>
+                {isLoading ? <Skeleton className="h-8 w-24 mt-1" /> : (
+                  <p className="text-2xl font-bold text-foreground mt-1">
+                    R$ {(stats?.receitaTotal || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-success/10 flex items-center justify-center">
                 <DollarSign className="h-5 w-5 text-success" />
@@ -85,10 +77,9 @@ const DashboardPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pacientes Ativos</p>
-                <p className="text-2xl font-bold text-foreground mt-1">284</p>
-                <p className="text-xs text-success flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" /> +3 esta semana
-                </p>
+                {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : (
+                  <p className="text-2xl font-bold text-foreground mt-1">{stats?.totalClientes || 0}</p>
+                )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Users className="h-5 w-5 text-primary" />
@@ -101,11 +92,10 @@ const DashboardPage = () => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Taxa de Faltas</p>
-                <p className="text-2xl font-bold text-foreground mt-1">4.2%</p>
-                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <TrendingDown className="h-3 w-3" /> -2% vs mês anterior
-                </p>
+                <p className="text-sm text-muted-foreground">Faturas Pendentes</p>
+                {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : (
+                  <p className="text-2xl font-bold text-foreground mt-1">{stats?.faturasPendentes || 0}</p>
+                )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-destructive/10 flex items-center justify-center">
                 <Clock className="h-5 w-5 text-destructive" />
@@ -117,7 +107,6 @@ const DashboardPage = () => {
 
       {/* Chart + Upcoming */}
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Chart */}
         <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "300ms" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Fluxo Financeiro Semanal</CardTitle>
@@ -146,25 +135,36 @@ const DashboardPage = () => {
           </CardContent>
         </Card>
 
-        {/* Upcoming */}
         <Card className="lg:col-span-2 animate-fade-in" style={{ animationDelay: "380ms" }}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Próximos Atendimentos</CardTitle>
+            <CardTitle className="text-base font-semibold">Agendamentos de Hoje</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {proximosAtendimentos.map((item, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                  <span className="text-sm font-mono font-semibold text-muted-foreground w-12">{item.hora}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.paciente}</p>
-                    <p className="text-xs text-muted-foreground">{item.servico} • {item.profissional}</p>
+              {(agendamentosHoje || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Nenhum agendamento hoje</p>
+              ) : (
+                (agendamentosHoje || []).slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+                    <span className="text-sm font-mono font-semibold text-muted-foreground w-12">
+                      {item.horario_inicio?.slice(0, 5)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {(item as any).turmas?.nome || "Turma"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.horario_inicio?.slice(0, 5)} — {item.horario_fim?.slice(0, 5)}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      item.status === "confirmado" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+                    }`}>
+                      {item.status || "Agendado"}
+                    </span>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[item.status]}`}>
-                    {item.status === "confirmado" ? "Confirmado" : "Pendente"}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

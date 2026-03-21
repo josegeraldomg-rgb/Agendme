@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import { ClientLayout } from "@/components/ClientLayout";
 import { SaasLayout } from "@/components/SaasLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import HorariosPage from "./pages/HorariosPage";
 import AgendaPage from "./pages/AgendaPage";
@@ -23,6 +25,8 @@ import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
 import WebhooksPage from "./pages/WebhooksPage";
+import LoginPage from "./pages/LoginPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
 import ClientCategoryPage from "./pages/client/ClientCategoryPage";
 import ClientServiceDetailPage from "./pages/client/ClientServiceDetailPage";
@@ -50,52 +54,56 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          {/* Admin routes */}
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/agenda" element={<AgendaPage />} />
-            <Route path="/horarios" element={<HorariosPage />} />
-            <Route path="/pacientes" element={<PacientesPage />} />
-            <Route path="/servicos" element={<ServicosPage />} />
-            <Route path="/prontuario" element={<ProntuarioPage />} />
-            <Route path="/financeiro" element={<FinanceiroPage />} />
-            <Route path="/whatsapp" element={<WhatsAppPage />} />
-            <Route path="/ausencias" element={<AusenciasPage />} />
-            <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
-            <Route path="/notificacoes" element={<NotificacoesPage />} />
-            <Route path="/configuracoes" element={<ConfiguracoesPage />} />
-            <Route path="/teleconsulta" element={<TeleconsultaPage />} />
-            <Route path="/relatorios" element={<RelatoriosPage />} />
-            <Route path="/webhooks" element={<WebhooksPage />} />
-          </Route>
-          {/* Client app routes — scoped by empresa slug */}
-          <Route path="/app/login" element={<ClientLoginPage />} />
-          <Route path="/app/:slug" element={<ClientLayout />}>
-            <Route index element={<ClientHomePage />} />
-            <Route path="categoria/:id" element={<ClientCategoryPage />} />
-            <Route path="servico/:id" element={<ClientServiceDetailPage />} />
-            <Route path="agendar" element={<ClientBookingFlowPage />} />
-            <Route path="historico" element={<ClientHistoryPage />} />
-            <Route path="perfil" element={<ClientProfilePage />} />
-          </Route>
-          {/* SaaS Owner routes */}
-          <Route path="/saas/login" element={<SaasLoginPage />} />
-          <Route element={<SaasLayout />}>
-            <Route path="/saas/dashboard" element={<SaasDashboardPage />} />
-            <Route path="/saas/planos" element={<SaasPlanosPage />} />
-            <Route path="/saas/empresas" element={<SaasEmpresasPage />} />
-            <Route path="/saas/empresa/:id" element={<SaasEmpresaDetailPage />} />
-            <Route path="/saas/assinaturas" element={<SaasAssinaturasPage />} />
-            <Route path="/saas/pagamentos" element={<SaasPagamentosPage />} />
-            <Route path="/saas/logs" element={<SaasLogsPage />} />
-            <Route path="/saas/permissoes" element={<SaasPermissoesPage />} />
-            <Route path="/saas/backup" element={<BackupAuditoriaPage />} />
-            <Route path="/saas/cache" element={<SaasCachePage />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            {/* Admin routes - protected */}
+            <Route element={<ProtectedRoute redirectTo="/login"><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/agenda" element={<AgendaPage />} />
+              <Route path="/horarios" element={<HorariosPage />} />
+              <Route path="/pacientes" element={<PacientesPage />} />
+              <Route path="/servicos" element={<ServicosPage />} />
+              <Route path="/prontuario" element={<ProntuarioPage />} />
+              <Route path="/financeiro" element={<FinanceiroPage />} />
+              <Route path="/whatsapp" element={<WhatsAppPage />} />
+              <Route path="/ausencias" element={<AusenciasPage />} />
+              <Route path="/usuarios" element={<UsuariosPermissoesPage />} />
+              <Route path="/notificacoes" element={<NotificacoesPage />} />
+              <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+              <Route path="/teleconsulta" element={<TeleconsultaPage />} />
+              <Route path="/relatorios" element={<RelatoriosPage />} />
+              <Route path="/webhooks" element={<WebhooksPage />} />
+            </Route>
+            {/* Client app routes */}
+            <Route path="/app/login" element={<ClientLoginPage />} />
+            <Route path="/app/:slug" element={<ClientLayout />}>
+              <Route index element={<ClientHomePage />} />
+              <Route path="categoria/:id" element={<ClientCategoryPage />} />
+              <Route path="servico/:id" element={<ClientServiceDetailPage />} />
+              <Route path="agendar" element={<ClientBookingFlowPage />} />
+              <Route path="historico" element={<ClientHistoryPage />} />
+              <Route path="perfil" element={<ClientProfilePage />} />
+            </Route>
+            {/* SaaS Owner routes */}
+            <Route path="/saas/login" element={<SaasLoginPage />} />
+            <Route element={<ProtectedRoute redirectTo="/saas/login"><SaasLayout /></ProtectedRoute>}>
+              <Route path="/saas/dashboard" element={<SaasDashboardPage />} />
+              <Route path="/saas/planos" element={<SaasPlanosPage />} />
+              <Route path="/saas/empresas" element={<SaasEmpresasPage />} />
+              <Route path="/saas/empresa/:id" element={<SaasEmpresaDetailPage />} />
+              <Route path="/saas/assinaturas" element={<SaasAssinaturasPage />} />
+              <Route path="/saas/pagamentos" element={<SaasPagamentosPage />} />
+              <Route path="/saas/logs" element={<SaasLogsPage />} />
+              <Route path="/saas/permissoes" element={<SaasPermissoesPage />} />
+              <Route path="/saas/backup" element={<BackupAuditoriaPage />} />
+              <Route path="/saas/cache" element={<SaasCachePage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
