@@ -15,8 +15,7 @@ import WhatsAppPage from "./pages/WhatsAppPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
 import ClientCategoryPage from "./pages/client/ClientCategoryPage";
 import ClientServiceDetailPage from "./pages/client/ClientServiceDetailPage";
-import ClientBookingDatePage from "./pages/client/ClientBookingDatePage";
-import ClientBookingConfirmPage from "./pages/client/ClientBookingConfirmPage";
+import ClientBookingFlowPage from "./pages/client/ClientBookingFlowPage";
 import ClientHistoryPage from "./pages/client/ClientHistoryPage";
 import ClientProfilePage from "./pages/client/ClientProfilePage";
 import ClientLoginPage from "./pages/client/ClientLoginPage";
@@ -48,8 +47,7 @@ const App = () => (
             <Route path="/app" element={<ClientHomePage />} />
             <Route path="/app/categoria/:id" element={<ClientCategoryPage />} />
             <Route path="/app/servico/:id" element={<ClientServiceDetailPage />} />
-            <Route path="/app/agendar" element={<ClientBookingDatePage />} />
-            <Route path="/app/agendar/confirmacao" element={<ClientBookingConfirmPage />} />
+            <Route path="/app/agendar" element={<ClientBookingFlowPage />} />
             <Route path="/app/historico" element={<ClientHistoryPage />} />
             <Route path="/app/perfil" element={<ClientProfilePage />} />
           </Route>

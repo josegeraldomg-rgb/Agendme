@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Início", path: "/app" },
-  { icon: CalendarDays, label: "Agendar", path: "/app/agendar" },
+  { icon: CalendarDays, label: "Agendar", path: "/app/agendar", matchExact: true },
   { icon: Clock, label: "Histórico", path: "/app/historico" },
   { icon: User, label: "Perfil", path: "/app/perfil" },
 ];
