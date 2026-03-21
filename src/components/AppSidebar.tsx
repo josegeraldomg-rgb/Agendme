@@ -17,6 +17,7 @@ import {
   LogOut,
   Shield,
   Video,
+  BarChart3,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
