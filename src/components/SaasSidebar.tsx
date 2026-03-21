@@ -8,6 +8,7 @@ import {
   ScrollText,
   ShieldCheck,
   Database,
+  Zap,
   Menu,
   X,
   LogOut,
@@ -25,6 +26,7 @@ const navItems = [
   { to: "/saas/logs", label: "Logs", icon: ScrollText },
   { to: "/saas/permissoes", label: "Permissões", icon: ShieldCheck },
   { to: "/saas/backup", label: "Backup & Auditoria", icon: Database },
+  { to: "/saas/cache", label: "Cache Global", icon: Zap },
 ];
 
 export function SaasSidebar() {
