@@ -40,6 +40,7 @@ import SaasPagamentosPage from "./pages/saas/SaasPagamentosPage";
 import SaasLogsPage from "./pages/saas/SaasLogsPage";
 import SaasPermissoesPage from "./pages/saas/SaasPermissoesPage";
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient();
 
@@ -50,7 +51,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<LandingPage />} />
           {/* Admin routes */}
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
