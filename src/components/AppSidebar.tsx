@@ -48,8 +48,9 @@ const navGroups: NavGroup[] = [
   {
     label: "Principal",
     items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/dashboard", label: "Página Inicial", icon: LayoutDashboard },
       { to: "/agenda", label: "Agenda", icon: Calendar },
+      { to: "/ausencias", label: "Ausências", icon: CalendarOff },
       { to: "/horarios", label: "Horários", icon: Clock },
     ],
   },
@@ -73,7 +74,6 @@ const navGroups: NavGroup[] = [
     label: "Comunicação",
     items: [
       { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
-      { to: "/ausencias", label: "Ausências", icon: CalendarOff },
     ],
   },
   {
