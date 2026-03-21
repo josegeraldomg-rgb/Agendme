@@ -16,6 +16,7 @@ import {
   Building2,
   LogOut,
   Shield,
+  Video,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
