@@ -89,6 +89,7 @@ const App = () => (
             <Route path="/saas/logs" element={<SaasLogsPage />} />
             <Route path="/saas/permissoes" element={<SaasPermissoesPage />} />
             <Route path="/saas/backup" element={<BackupAuditoriaPage />} />
+            <Route path="/saas/cache" element={<SaasCachePage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
