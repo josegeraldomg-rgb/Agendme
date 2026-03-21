@@ -80,6 +80,7 @@ const navGroups: NavGroup[] = [
     label: "Administração",
     items: [
       { to: "/usuarios", label: "Permissões", icon: Shield },
+      { to: "/webhooks", label: "Webhooks", icon: Webhook },
     ],
   },
 ];
