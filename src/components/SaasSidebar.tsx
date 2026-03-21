@@ -50,9 +50,7 @@ export function SaasSidebar() {
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">A</span>
-            </div>
+            <img src={logo} alt="Agend.me" className="h-8 w-8" />
             <div>
               <span className="text-lg font-bold text-sidebar-accent-foreground">Agend.me</span>
               <p className="text-[10px] text-sidebar-muted -mt-0.5">Painel SaaS</p>
