@@ -21,7 +21,7 @@ const mockProfessionals = [
 ];
 
 export default function ClientServiceDetailPage() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const service = allServices[id || ""];
 
