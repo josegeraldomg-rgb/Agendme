@@ -73,6 +73,7 @@ type Step = "category" | "service" | "date" | "professional" | "attachment" | "f
 
 export default function ClientBookingFlowPage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const [step, setStep] = useState<Step>("category");
 
   // Selections
