@@ -47,9 +47,9 @@ export default function ClientHomePage() {
       </div>
 
       {/* Categories */}
-      <div className="px-5 pt-6">
+      <div className="px-5 pt-6 flex-1">
         <h2 className="text-base font-semibold text-foreground mb-4">Categorias</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 auto-rows-fr">
           {filtered.map((cat) => (
             <button
               key={cat.id}
