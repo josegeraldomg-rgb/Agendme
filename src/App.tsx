@@ -51,6 +51,7 @@ const App = () => (
             <Route path="/prontuario" element={<ProntuarioPage />} />
             <Route path="/financeiro" element={<FinanceiroPage />} />
             <Route path="/whatsapp" element={<WhatsAppPage />} />
+            <Route path="/ausencias" element={<AusenciasPage />} />
           </Route>
           {/* Client app routes */}
           <Route path="/app/login" element={<ClientLoginPage />} />
