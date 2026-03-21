@@ -50,7 +50,7 @@ export default function ClientCategoryPage() {
         {services.map((service) => (
           <button
             key={service.id}
-            onClick={() => navigate(`/app/servico/${service.id}`)}
+            onClick={() => navigate(`/app/${slug}/servico/${service.id}`)}
             className="w-full bg-card rounded-xl border border-border p-4 text-left hover:border-primary/30 hover:shadow-sm transition-all"
           >
             <h3 className="font-medium text-foreground text-sm">{service.nome}</h3>
