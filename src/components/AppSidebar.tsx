@@ -44,6 +44,7 @@ const navItems = [
   { to: "/ausencias", label: "Ausências", icon: CalendarOff },
   { to: "/usuarios", label: "Permissões", icon: Shield },
   { to: "/teleconsulta", label: "Teleconsulta", icon: Video },
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 
 export function AppSidebar() {
