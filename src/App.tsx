@@ -22,6 +22,7 @@ import SaasCachePage from "./pages/saas/SaasCachePage";
 import FinanceiroPage from "./pages/FinanceiroPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import AusenciasPage from "./pages/AusenciasPage";
+import WebhooksPage from "./pages/WebhooksPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
 import ClientCategoryPage from "./pages/client/ClientCategoryPage";
 import ClientServiceDetailPage from "./pages/client/ClientServiceDetailPage";
