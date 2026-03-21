@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import logo from "@/assets/logo-agendme.png";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -56,9 +57,7 @@ export function AppSidebar() {
         {/* Header */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">A</span>
-            </div>
+            <img src={logo} alt="Agend.me" className="h-8 w-8" />
             <span className="text-lg font-bold text-sidebar-accent-foreground">Agend.me</span>
           </div>
           <button onClick={() => setMobileOpen(false)} className="lg:hidden text-sidebar-muted">

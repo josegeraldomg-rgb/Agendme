@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import logo from "@/assets/logo-agendme.png";
 
 export default function SaasLoginPage() {
   const navigate = useNavigate();
@@ -28,9 +29,7 @@ export default function SaasLoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
-            <span className="text-xl font-bold text-primary-foreground">A</span>
-          </div>
+          <img src={logo} alt="Agend.me" className="h-14 w-14 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-foreground">Agend.me</h1>
           <p className="text-sm text-muted-foreground mt-1">Painel do Administrador SaaS</p>
         </div>
