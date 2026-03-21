@@ -1,9 +1,10 @@
 import { Search, MessageCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import logo from "@/assets/logo-agendme.png";
+import { useClientEmpresa } from "@/contexts/ClientEmpresaContext";
 
 const mockCategories = [
   { id: "1", nome: "Estética Facial", icon: "✨", count: 8 },
