@@ -46,6 +46,7 @@ export default function WhatsAppPage() {
   const [numeroLocal, setNumeroLocal] = useState("");
   const [iaAtivoLocal, setIaAtivoLocal] = useState(false);
   const [promptLocal, setPromptLocal] = useState("");
+  const [telefonesAdminLocal, setTelefonesAdminLocal] = useState("");
   const [configsLoaded, setConfigsLoaded] = useState(false);
 
   // Sincronizar com remote state
@@ -56,6 +57,7 @@ export default function WhatsAppPage() {
       setNumeroLocal(config.numero || "");
       setIaAtivoLocal(config.ia_ativo || false);
       setPromptLocal(config.ia_prompt || "");
+      setTelefonesAdminLocal(config.telefones_admin || "");
       setConfigsLoaded(true);
     }
   }, [config, configsLoaded]);
@@ -67,6 +69,7 @@ export default function WhatsAppPage() {
       numero: numeroLocal || config?.numero,
       ia_ativo: iaAtivoLocal,
       ia_prompt: promptLocal,
+      telefones_admin: telefonesAdminLocal,
       provedor: "uazapi"
     });
   };
@@ -266,6 +269,19 @@ export default function WhatsAppPage() {
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     Aqui você ensina a IA como agir. Quaisquer regras de negócio restritas (não dar desconto, limitar dias de retorno) entram aqui.
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Números de Telefone Autorizados (Chefe/Recepção)</Label>
+                  <Input 
+                    value={telefonesAdminLocal}
+                    onChange={(e) => setTelefonesAdminLocal(e.target.value)}
+                    placeholder="Ex: 5511999999999, 5511888888888" 
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Separe por vírgula. Quando o Agente receber mensagem DESSES NÚMEROS, ele assumirá a postura de "Co-Piloto Administrativo" (Acesso irrestrito à agenda, bloqueios e estado da clínica).
                   </p>
                 </div>
 
