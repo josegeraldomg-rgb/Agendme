@@ -61,24 +61,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+          }
+        } catch (err) {
+          console.error("Erro no onAuthStateChange", err);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     // Load initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+      try {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar sessão inicial", err);
+      } finally {
+        setLoading(false);
       }
+    }).catch(err => {
+      console.error("Erro fatal no getSession do Supabase", err);
       setLoading(false);
     });
 
