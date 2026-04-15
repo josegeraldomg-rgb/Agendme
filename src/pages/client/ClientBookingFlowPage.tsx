@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Clock, DollarSign, Star, Upload, X, MessageCircle, ChevronRight, Check, CreditCard, QrCode, Smartphone, AlertCircle } from "lucide-react";
+import { useState, useRef } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Clock, DollarSign, Star, Upload, X, MessageCircle, ChevronRight, Check, CreditCard, QrCode, Smartphone, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -11,77 +11,45 @@ import { cn } from "@/lib/utils";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
-import { useAvailableSlots, isDateBlocked, getHolidayName } from "@/hooks/use-available-slots";
+import { useAvailableSlots, isDateBlocked } from "@/hooks/use-available-slots";
+import { useClientEmpresa } from "@/contexts/ClientEmpresaContext";
+import { useClientCategorias, useClientServicos, useClientProfissionais, useCriarAgendamento } from "@/hooks/use-client-portal";
 
-// --- Mock Data ---
-const mockCategories = [
-  { id: "1", nome: "Estética Facial", icon: "✨", count: 4 },
-  { id: "2", nome: "Estética Corporal", icon: "💆", count: 2 },
-  { id: "3", nome: "Depilação", icon: "🌿", count: 2 },
-  { id: "4", nome: "Massagens", icon: "🤲", count: 3 },
-  { id: "5", nome: "Cabelo", icon: "💇", count: 4 },
-  { id: "6", nome: "Unhas", icon: "💅", count: 3 },
-];
 
-const mockServices: Record<string, { id: string; nome: string; preco: number; duracao: number; descricao: string; whatsappOnly?: boolean }[]> = {
-  "1": [
-    { id: "s1", nome: "Limpeza de Pele", preco: 150, duracao: 60, descricao: "Limpeza profunda com extração de cravos e espinhas" },
-    { id: "s2", nome: "Peeling Químico", preco: 280, duracao: 45, descricao: "Renovação celular com ácidos" },
-    { id: "s3", nome: "Microagulhamento", preco: 350, duracao: 50, descricao: "Estímulo de colágeno", whatsappOnly: true },
-    { id: "s4", nome: "Botox", preco: 800, duracao: 30, descricao: "Toxina botulínica para rugas", whatsappOnly: true },
-  ],
-  "2": [
-    { id: "s5", nome: "Drenagem Linfática", preco: 120, duracao: 60, descricao: "Massagem para reduzir inchaço" },
-    { id: "s6", nome: "Criolipólise", preco: 500, duracao: 40, descricao: "Congelamento de gordura localizada" },
-  ],
-  "3": [
-    { id: "s7", nome: "Depilação a Laser", preco: 200, duracao: 30, descricao: "Laser de diodo" },
-    { id: "s8", nome: "Depilação com Cera", preco: 80, duracao: 20, descricao: "Cera morna" },
-  ],
-  "4": [
-    { id: "s9", nome: "Massagem Relaxante", preco: 130, duracao: 60, descricao: "Massagem suave para relaxamento" },
-    { id: "s10", nome: "Massagem Modeladora", preco: 160, duracao: 50, descricao: "Massagem para modelar o corpo" },
-    { id: "s11", nome: "Reflexologia", preco: 100, duracao: 40, descricao: "Massagem nos pés" },
-  ],
-  "5": [
-    { id: "s12", nome: "Corte Feminino", preco: 90, duracao: 45, descricao: "Corte e finalização" },
-    { id: "s13", nome: "Coloração", preco: 200, duracao: 90, descricao: "Coloração completa" },
-    { id: "s14", nome: "Escova Progressiva", preco: 250, duracao: 120, descricao: "Alisamento progressivo" },
-    { id: "s15", nome: "Hidratação", preco: 80, duracao: 40, descricao: "Hidratação profunda" },
-  ],
-  "6": [
-    { id: "s16", nome: "Manicure", preco: 40, duracao: 30, descricao: "Esmaltação simples" },
-    { id: "s17", nome: "Pedicure", preco: 50, duracao: 40, descricao: "Cuidados com os pés" },
-    { id: "s18", nome: "Unhas em Gel", preco: 120, duracao: 60, descricao: "Alongamento em gel" },
-  ],
-};
+// Shapes usadas internamente
+type ClientCategory = { id: string; nome: string; icone?: string; descricao?: string };
+type ClientService  = { id: string; nome: string; preco: number | string; duracao_minutos: number; descricao?: string; whatsapp_only?: boolean };
+type ClientProf     = { id: string; nome: string; especialidade?: string; avatar_url?: string };
 
-const mockProfessionals = [
-  { id: "p1", nome: "Dra. Ana Silva", especialidade: "Dermatologista", rating: 4.9, avatar: "AS" },
-  { id: "p2", nome: "Dr. Carlos Mendes", especialidade: "Esteticista", rating: 4.7, avatar: "CM" },
-  { id: "p3", nome: "Dra. Mariana Costa", especialidade: "Fisioterapeuta", rating: 4.8, avatar: "MC" },
-];
-
-// Company config mock
-const companyConfig = {
-  requireAdvancePayment: false, // toggle to test payment step
-  advancePaymentPercent: 30,
-  whatsappNumber: "5511999999999",
-};
+const categoryEmojis = ["✨", "💆", "🌿", "🤲", "💇", "💅", "🏥", "💊"];
 
 type Step = "category" | "service" | "date" | "professional" | "attachment" | "finalize";
+
 
 export default function ClientBookingFlowPage() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const { empresa } = useClientEmpresa();
+  const criarAgendamento = useCriarAgendamento();
+
   const [step, setStep] = useState<Step>("category");
 
-  // Selections
-  const [selectedCategory, setSelectedCategory] = useState<typeof mockCategories[0] | null>(null);
-  const [selectedService, setSelectedService] = useState<typeof mockServices["1"][0] | null>(null);
+  // Selections — tipos reais
+  const [selectedCategory, setSelectedCategory] = useState<ClientCategory | null>(null);
+  const [selectedService, setSelectedService] = useState<ClientService | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedProfessional, setSelectedProfessional] = useState<typeof mockProfessionals[0] | null>(null);
+  const [selectedProfessional, setSelectedProfessional] = useState<ClientProf | null>(null);
   const [selectedTime, setSelectedTime] = useState("");
+
+  // Real data from Supabase
+  const { data: categorias = [], isLoading: loadingCats } = useClientCategorias(empresa?.id);
+  const { data: servicos = [], isLoading: loadingSvcs } = useClientServicos(empresa?.id, selectedCategory?.id);
+  const { data: profissionais = [], isLoading: loadingProfs } = useClientProfissionais(empresa?.id, selectedService?.id);
+
+  const whatsappNumber = empresa?.config
+    ? (empresa.config as Record<string, string>).whatsapp || "5511999999999"
+    : "5511999999999";
 
   // Attachment & notes
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
@@ -95,12 +63,11 @@ export default function ClientBookingFlowPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const today = new Date();
 
   // --- Handlers ---
-  const handleSelectCategory = (cat: typeof mockCategories[0]) => {
+  const handleSelectCategory = (cat: ClientCategory) => {
     setSelectedCategory(cat);
     setSelectedService(null);
     setSelectedDate(undefined);
@@ -109,13 +76,13 @@ export default function ClientBookingFlowPage() {
     setStep("service");
   };
 
-  const handleSelectService = (svc: typeof mockServices["1"][0]) => {
+  const handleSelectService = (svc: { id: string; nome: string; preco: number; duracao: number; descricao: string; whatsappOnly?: boolean }) => {
     if (svc.whatsappOnly) {
       const msg = encodeURIComponent(`Olá! Gostaria de agendar: ${svc.nome}`);
-      window.open(`https://wa.me/${companyConfig.whatsappNumber}?text=${msg}`, "_blank");
+      window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, "_blank");
       return;
     }
-    setSelectedService(svc);
+    setSelectedService({ id: svc.id, nome: svc.nome, preco: svc.preco, duracao_minutos: svc.duracao, descricao: svc.descricao });
     setSelectedDate(undefined);
     setSelectedProfessional(null);
     setSelectedTime("");
@@ -129,7 +96,7 @@ export default function ClientBookingFlowPage() {
     if (date) setStep("professional");
   };
 
-  const handleSelectTimeSlot = (prof: typeof mockProfessionals[0], time: string) => {
+  const handleSelectTimeSlot = (prof: ClientProf, time: string) => {
     setSelectedProfessional(prof);
     setSelectedTime(time);
     setStep("attachment");
@@ -148,21 +115,32 @@ export default function ClientBookingFlowPage() {
     setStep("finalize");
   };
 
-  const handleConfirmViaLogin = () => {
+  const handleConfirmViaLogin = async () => {
     if (!nome.trim() || !email.trim() || !senha.trim()) {
       toast({ title: "Preencha nome, email e senha", variant: "destructive" });
       return;
     }
-    if (companyConfig.requireAdvancePayment && !paymentMethod) {
-      toast({ title: "Selecione um meio de pagamento", variant: "destructive" });
+    if (!empresa?.id || !selectedService || !selectedProfessional || !selectedDate || !selectedTime) {
+      toast({ title: "Dados incompletos", description: "Volte e selecione serviço, data e profissional.", variant: "destructive" });
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast({ title: "Agendamento confirmado! ✅", description: "Você receberá uma confirmação por WhatsApp." });
-      navigate(`/app/${slug}/historico`);
-    }, 1500);
+    // Montar dataHora
+    const [h, m] = selectedTime.split(":").map(Number);
+    const dataHora = new Date(selectedDate);
+    dataHora.setHours(h, m, 0, 0);
+
+    criarAgendamento.mutate({
+      empresaId: empresa.id,
+      servicoId: selectedService.id,
+      profissionalId: selectedProfessional.id,
+      dataHora,
+      observacoes: observacao || undefined,
+      nomeCliente: nome,
+      emailCliente: email,
+      telefoneCliente: telefone,
+    }, {
+      onSuccess: () => navigate(`/app/${slug}/historico`),
+    });
   };
 
   const handleConfirmViaWhatsApp = () => {
@@ -181,7 +159,7 @@ export default function ClientBookingFlowPage() {
       `📱 Telefone: ${telefone}\n` +
       (observacao ? `📝 Obs: ${observacao}\n` : "")
     );
-    window.open(`https://wa.me/${companyConfig.whatsappNumber}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, "_blank");
     toast({ title: "Redirecionando para WhatsApp...", description: "Finalize seu agendamento pela conversa." });
   };
 
@@ -279,17 +257,17 @@ export default function ClientBookingFlowPage() {
         {step === "category" && (
           <div>
             <h2 className="text-sm font-semibold text-foreground mb-3">Escolha a categoria</h2>
+            {loadingCats && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
             <div className="grid grid-cols-2 gap-3">
-              {mockCategories.map((cat) => (
+              {categorias.map((cat, idx) => (
                 <button
                   key={cat.id}
-                  onClick={() => handleSelectCategory(cat)}
+                  onClick={() => handleSelectCategory({ ...cat, id: cat.id })}
                   className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border hover:border-primary/40 hover:shadow-sm transition-all text-left"
                 >
-                  <span className="text-2xl">{cat.icon}</span>
+                  <span className="text-2xl">{cat.icone || categoryEmojis[idx % categoryEmojis.length]}</span>
                   <div>
                     <p className="text-sm font-medium text-foreground">{cat.nome}</p>
-                    <p className="text-xs text-muted-foreground">{cat.count} serviços</p>
                   </div>
                 </button>
               ))}
@@ -301,39 +279,30 @@ export default function ClientBookingFlowPage() {
         {step === "service" && selectedCategory && (
           <div>
             <h2 className="text-sm font-semibold text-foreground mb-3">Escolha o serviço</h2>
+            {loadingSvcs && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
             <div className="space-y-3">
-              {(mockServices[selectedCategory.id] || []).map((svc) => (
-                <div
-                  key={svc.id}
-                  className="bg-card rounded-xl border border-border p-4"
-                >
+              {servicos.map((svc) => (
+                <div key={svc.id} className="bg-card rounded-xl border border-border p-4">
                   <h3 className="font-medium text-foreground text-sm">{svc.nome}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{svc.descricao}</p>
+                  {svc.descricao && <p className="text-xs text-muted-foreground mt-1">{svc.descricao}</p>}
                   <div className="flex items-center gap-4 mt-2">
                     <span className="flex items-center gap-1 text-xs text-primary font-semibold">
-                      <DollarSign className="h-3.5 w-3.5" /> R$ {svc.preco.toFixed(2)}
+                      <DollarSign className="h-3.5 w-3.5" /> R$ {Number(svc.preco).toFixed(2)}
                     </span>
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" /> {svc.duracao} min
+                      <Clock className="h-3.5 w-3.5" /> {svc.duracao_minutos} min
                     </span>
                   </div>
                   <div className="mt-3">
-                    {svc.whatsappOnly ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
+                    {svc.whatsapp_only ? (
+                      <Button size="sm" variant="outline"
                         className="w-full h-9 text-xs gap-1.5 border-success text-success hover:bg-success/10"
-                        onClick={() => handleSelectService(svc)}
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Chamar no WhatsApp
+                        onClick={() => handleSelectService({ id: svc.id, nome: svc.nome, preco: Number(svc.preco), duracao: svc.duracao_minutos, descricao: svc.descricao || "", whatsappOnly: true })}>
+                        <MessageCircle className="h-3.5 w-3.5" /> Chamar no WhatsApp
                       </Button>
                     ) : (
-                      <Button
-                        size="sm"
-                        className="w-full h-9 text-xs"
-                        onClick={() => handleSelectService(svc)}
-                      >
+                      <Button size="sm" className="w-full h-9 text-xs"
+                        onClick={() => handleSelectService({ id: svc.id, nome: svc.nome, preco: Number(svc.preco), duracao: svc.duracao_minutos, descricao: svc.descricao || "" })}>
                         Agendar
                       </Button>
                     )}
@@ -365,18 +334,22 @@ export default function ClientBookingFlowPage() {
             <h2 className="text-sm font-semibold text-foreground mb-3">
               Profissional e horário — {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
             </h2>
+            {loadingProfs && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
             <div className="space-y-4">
-              {mockProfessionals.map((prof) => (
+              {profissionais.map((prof) => (
                 <ProfessionalSlotCard
                   key={prof.id}
-                  prof={prof}
+                  prof={{ id: prof.id, nome: prof.nome, especialidade: prof.especialidade || "", avatar: (prof.nome || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() }}
                   date={selectedDate}
-                  duracaoServico={selectedService?.duracao || 30}
+                  duracaoServico={selectedService?.duracao_minutos || 30}
                   selectedProfessional={selectedProfessional}
                   selectedTime={selectedTime}
-                  onSelectTimeSlot={handleSelectTimeSlot}
+                  onSelectTimeSlot={(p, t) => handleSelectTimeSlot({ id: p.id, nome: p.nome, especialidade: p.especialidade, avatar_url: undefined }, t)}
                 />
               ))}
+              {!loadingProfs && profissionais.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-6">Nenhum profissional disponível para este serviço.</p>
+              )}
             </div>
           </div>
         )}
@@ -535,9 +508,9 @@ export default function ClientBookingFlowPage() {
                 <Button
                   className="w-full h-12 rounded-xl text-sm font-semibold"
                   onClick={handleConfirmViaLogin}
-                  disabled={loading}
+                  disabled={criarAgendamento.isPending}
                 >
-                  {loading ? "Confirmando..." : "Confirmar Agendamento"}
+                  {criarAgendamento.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Confirmando...</> : "Confirmar Agendamento"}
                 </Button>
                 <button onClick={() => setFinalizeMode(null)} className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-2">
                   ← Voltar às opções
