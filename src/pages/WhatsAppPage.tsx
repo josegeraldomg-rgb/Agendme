@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -48,14 +48,16 @@ export default function WhatsAppPage() {
   const [configsLoaded, setConfigsLoaded] = useState(false);
 
   // Sincronizar com remote state
-  if (config && !configsLoaded) {
-    setTokenLocal(config.token_api || "");
-    setUrlLocal(config.url_api || "");
-    setNumeroLocal(config.numero || "");
-    setIaAtivoLocal(config.ia_ativo || false);
-    setPromptLocal(config.ia_prompt || "");
-    setConfigsLoaded(true);
-  }
+  useEffect(() => {
+    if (config && !configsLoaded) {
+      setTokenLocal(config.token_api || "");
+      setUrlLocal(config.url_api || "");
+      setNumeroLocal(config.numero || "");
+      setIaAtivoLocal(config.ia_ativo || false);
+      setPromptLocal(config.ia_prompt || "");
+      setConfigsLoaded(true);
+    }
+  }, [config, configsLoaded]);
 
   const handleSaveConfig = () => {
     updateConfig.mutate({
