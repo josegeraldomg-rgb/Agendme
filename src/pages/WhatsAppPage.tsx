@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   MessageCircle, Send, Clock, CheckCircle, AlertCircle, BarChart3, Zap, TrendingDown,
   RefreshCw, Power, Settings
