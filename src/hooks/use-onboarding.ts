@@ -95,6 +95,11 @@ export function useOnboarding() {
 
       if (profileError) throw profileError;
 
+      // ── 2.5 Atualizar a sessão local (JWT Metadata) ──────────────────────
+      await supabase.auth.updateUser({
+        data: { empresa_id: empresaId }
+      });
+
       // ── 3. Criar primeiro profissional ───────────────────────────────────
       //   get_user_empresa_id() agora retorna empresaId pois o profile foi atualizado
       const { error: profError } = await supabase
