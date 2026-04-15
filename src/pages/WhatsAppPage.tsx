@@ -43,12 +43,27 @@ export default function WhatsAppPage() {
   const [tokenLocal, setTokenLocal] = useState("");
   const [urlLocal, setUrlLocal] = useState("");
   const [numeroLocal, setNumeroLocal] = useState("");
+  const [iaAtivoLocal, setIaAtivoLocal] = useState(false);
+  const [promptLocal, setPromptLocal] = useState("");
+  const [configsLoaded, setConfigsLoaded] = useState(false);
+
+  // Sincronizar com remote state
+  if (config && !configsLoaded) {
+    setTokenLocal(config.token_api || "");
+    setUrlLocal(config.url_api || "");
+    setNumeroLocal(config.numero || "");
+    setIaAtivoLocal(config.ia_ativo || false);
+    setPromptLocal(config.ia_prompt || "");
+    setConfigsLoaded(true);
+  }
 
   const handleSaveConfig = () => {
     updateConfig.mutate({
       token_api: tokenLocal || config?.token_api,
       url_api: urlLocal || config?.url_api,
       numero: numeroLocal || config?.numero,
+      ia_ativo: iaAtivoLocal,
+      ia_prompt: promptLocal,
       provedor: "uazapi"
     });
   };
@@ -66,11 +81,12 @@ export default function WhatsAppPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="painel">Painel</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="conexao">Conexão</TabsTrigger>
+          <TabsTrigger value="agente">Agente IA</TabsTrigger>
         </TabsList>
 
         <TabsContent value="painel" className="space-y-6 mt-4">
@@ -208,6 +224,57 @@ export default function WhatsAppPage() {
           </Card>
         </TabsContent>
 
+        {/* ── GUIA DO AGENTE IA ── */}
+        <TabsContent value="agente" className="mt-4">
+          <Card className="bg-card">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-primary" />
+                    Piloto Automático (Agente NLP)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium">Ativar Agente Autônomo</Label>
+                    <button
+                      type="button"
+                      onClick={() => setIaAtivoLocal(!iaAtivoLocal)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${iaAtivoLocal ? "bg-primary" : "bg-muted"}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${iaAtivoLocal ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Quando ativo, o Agente de Inteligência Artificial usando o ChatGPT responderá os pacientes automaticamente,
+                  consultando horários livres e gravando marcações na sua agenda real sem intervenção humana.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Prompt do Sistema (Regras de Ouro e Personalidade)</Label>
+                  <textarea
+                    value={promptLocal}
+                    onChange={(e) => setPromptLocal(e.target.value)}
+                    placeholder="Ex: Haja como uma recepcionista carinhosa, ofereça sempre os horários da tarde primeiro..."
+                    rows={8}
+                    className="w-full mt-2 rounded-xl bg-background border border-input px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Aqui você ensina a IA como agir. Quaisquer regras de negócio restritas (não dar desconto, limitar dias de retorno) entram aqui.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-border">
+                  <Button onClick={handleSaveConfig} className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto">
+                    Salvar Configurações do Agente
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
