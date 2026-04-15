@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Shield, Users, Search, Plus, Edit2, Trash2, Save, Eye, ChevronRight,
-  ShieldCheck, ShieldAlert, Clock, Activity, UserCheck, Settings, Lock,
-  FileText, Calendar, DollarSign, MessageCircle, Briefcase, Stethoscope,
+  Shield, Users, Search, Plus, Save, ChevronRight,
+  ShieldCheck, ShieldAlert, Activity, UserCheck, Settings,
+  Calendar, DollarSign, MessageCircle, Briefcase, Stethoscope,
   LayoutDashboard, CalendarOff, Globe
 } from "lucide-react";
+import { useUsuarios, useAllUserRoles, useUpdateUserRole, AppRole } from "@/hooks/use-usuarios";
+
 
 /* ───── tipos ───── */
 interface Permissao {
@@ -52,82 +55,30 @@ interface LogAcesso {
   resultado: "permitido" | "negado";
 }
 
-/* ───── dados mock ───── */
-const modulosMock = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "agenda", label: "Agenda", icon: Calendar },
-  { key: "pacientes", label: "Pacientes", icon: Users },
-  { key: "servicos", label: "Serviços", icon: Briefcase },
-  { key: "prontuario", label: "Prontuário", icon: Stethoscope },
-  { key: "financeiro", label: "Financeiro", icon: DollarSign },
-  { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { key: "ausencias", label: "Ausências", icon: CalendarOff },
-  { key: "usuarios", label: "Usuários", icon: Users },
-  { key: "configuracoes", label: "Configurações", icon: Settings },
-];
-
-const acoesMock = ["visualizar", "criar", "editar", "excluir"];
-
-const allPermissoes: Permissao[] = modulosMock.flatMap(m =>
-  acoesMock.map(a => ({
-    id: `${m.key}.${a}`,
-    nome: `${m.key}.${a}`,
-    modulo: m.key,
-    descricao: `${a.charAt(0).toUpperCase() + a.slice(1)} ${m.label.toLowerCase()}`,
-  }))
-);
-
-const rolesMock: Role[] = [
-  {
-    id: "r1", nome: "Administrador", descricao: "Acesso total ao sistema", isDefault: true,
-    permissoes: allPermissoes.map(p => p.id),
-  },
-  {
-    id: "r2", nome: "Profissional", descricao: "Acesso à agenda própria, pacientes e prontuário", isDefault: true,
-    permissoes: [
-      "dashboard.visualizar", "agenda.visualizar", "pacientes.visualizar",
-      "prontuario.visualizar", "prontuario.criar", "prontuario.editar",
-      "financeiro.visualizar", "ausencias.visualizar", "ausencias.criar",
-    ],
-  },
-  {
-    id: "r3", nome: "Recepcionista", descricao: "Gestão de agenda e pacientes", isDefault: true,
-    permissoes: [
-      "dashboard.visualizar", "agenda.visualizar", "agenda.criar", "agenda.editar",
-      "pacientes.visualizar", "pacientes.criar", "pacientes.editar",
-      "servicos.visualizar", "whatsapp.visualizar",
-    ],
-  },
-  {
-    id: "r4", nome: "Dono do SaaS", descricao: "Gestão da plataforma SaaS", isDefault: true,
-    permissoes: allPermissoes.map(p => p.id),
-  },
-];
-
-const usuariosMock: Usuario[] = [
-  { id: "u1", nome: "Admin Principal", email: "admin@clinica.com", roleId: "r1", permissoesIndividuais: [], ativo: true },
-  { id: "u2", nome: "Dr. João Mendes", email: "joao@clinica.com", roleId: "r2", permissoesIndividuais: [], ativo: true },
-  { id: "u3", nome: "Dra. Paula Costa", email: "paula@clinica.com", roleId: "r2", permissoesIndividuais: [{ permissaoId: "financeiro.editar", permitido: true }], ativo: true },
-  { id: "u4", nome: "Ana Recepção", email: "ana@clinica.com", roleId: "r3", permissoesIndividuais: [], ativo: true },
-  { id: "u5", nome: "Carlos Oliveira", email: "carlos@clinica.com", roleId: "r2", permissoesIndividuais: [], ativo: false },
-];
-
-const logsMock: LogAcesso[] = [
-  { id: "l1", usuario: "Admin Principal", acao: "Editou permissões", modulo: "usuarios", dataHora: "21/03/2026 14:32", ip: "192.168.1.10", resultado: "permitido" },
-  { id: "l2", usuario: "Dr. João Mendes", acao: "Acessou prontuário", modulo: "prontuario", dataHora: "21/03/2026 14:15", ip: "192.168.1.22", resultado: "permitido" },
-  { id: "l3", usuario: "Ana Recepção", acao: "Tentou acessar financeiro", modulo: "financeiro", dataHora: "21/03/2026 13:50", ip: "192.168.1.15", resultado: "negado" },
-  { id: "l4", usuario: "Dra. Paula Costa", acao: "Criou prontuário", modulo: "prontuario", dataHora: "21/03/2026 12:30", ip: "192.168.1.18", resultado: "permitido" },
-  { id: "l5", usuario: "Admin Principal", acao: "Criou perfil", modulo: "usuarios", dataHora: "21/03/2026 11:00", ip: "192.168.1.10", resultado: "permitido" },
-  { id: "l6", usuario: "Carlos Oliveira", acao: "Tentou login", modulo: "auth", dataHora: "21/03/2026 10:45", ip: "10.0.0.5", resultado: "negado" },
-  { id: "l7", usuario: "Ana Recepção", acao: "Agendou paciente", modulo: "agenda", dataHora: "21/03/2026 10:20", ip: "192.168.1.15", resultado: "permitido" },
-  { id: "l8", usuario: "Dr. João Mendes", acao: "Tentou excluir paciente", modulo: "pacientes", dataHora: "21/03/2026 09:55", ip: "192.168.1.22", resultado: "negado" },
-];
-
-/* ═══════════════════════ COMPONENTE PRINCIPAL ═══════════════════════ */
+/* ─────────────────── COMPONENTE PRINCIPAL ─────────────────── */
 const UsuariosPermissoesPage = () => {
-  const [roles, setRoles] = useState(rolesMock);
-  const [usuarios, setUsuarios] = useState(usuariosMock);
-  const [logs] = useState(logsMock);
+  const { data: usuariosDB = [], isLoading: loadingUsers } = useUsuarios();
+  const { data: rolesDB = [], isLoading: loadingRoles } = useAllUserRoles();
+  const updateRole = useUpdateUserRole();
+
+  // Build usuarios list with role data
+  const usuarios: UsuarioLocal[] = useMemo(() => usuariosDB.map((u) => {
+    const userRole = rolesDB.find((r) => r.user_id === u.id);
+    return {
+      id: u.id,
+      nome: u.nome || u.email || "—",
+      email: u.email || "",
+      roleId: userRole?.role || "profissional",
+      permissoesIndividuais: [],
+      ativo: true,
+    };
+  }), [usuariosDB, rolesDB]);
+
+  // Static roles definition (UI level — actual enforcement is via Supabase RLS)
+  const roles = rolesMock;
+  // Empty access logs — would come from audit_log table (Épico 1.4)
+  const logs: LogAcesso[] = [];
+
   const [activeTab, setActiveTab] = useState("perfis");
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -170,23 +121,30 @@ const UsuariosPermissoesPage = () => {
   };
 
   const changeUserRole = (userId: string, roleId: string) => {
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, roleId } : u));
+    updateRole.mutate({ userId, role: roleId as AppRole });
   };
+
+
+  // Individual permissions (future: persist to DB in Épico 1.4)
+  const [localPerms, setLocalPerms] = useState<Record<string, { permissaoId: string; permitido: boolean }[]>>({});
 
   const toggleUserIndividual = (userId: string, permId: string) => {
-    setUsuarios(prev => prev.map(u => {
-      if (u.id !== userId) return u;
-      const existing = u.permissoesIndividuais.find(p => p.permissaoId === permId);
-      if (existing) {
-        return { ...u, permissoesIndividuais: u.permissoesIndividuais.filter(p => p.permissaoId !== permId) };
-      }
-      return { ...u, permissoesIndividuais: [...u.permissoesIndividuais, { permissaoId: permId, permitido: true }] };
-    }));
+    setLocalPerms(prev => {
+      const existing = (prev[userId] || []).find(p => p.permissaoId === permId);
+      const cur = prev[userId] || [];
+      return {
+        ...prev,
+        [userId]: existing
+          ? cur.filter(p => p.permissaoId !== permId)
+          : [...cur, { permissaoId: permId, permitido: true }],
+      };
+    });
   };
 
-  const toggleUserActive = (userId: string) => {
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ativo: !u.ativo } : u));
+  const toggleUserActive = (_userId: string) => {
+    // Disable/enable user would go through Supabase Auth admin (Épico 1.4)
   };
+
 
   const selectedRole = roles.find(r => r.id === selectedRoleId);
   const selectedUser = usuarios.find(u => u.id === selectedUserId);

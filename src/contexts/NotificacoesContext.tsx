@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, ReactNode, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type NotificacaoTipo = "sistema" | "agenda" | "financeiro" | "whatsapp" | "administrativo";
-export type NotificacaoPrioridade = "baixa" | "media" | "alta";
 export type NotificacaoStatus = "nao_lida" | "lida";
 
 export interface Notificacao {
@@ -9,14 +11,16 @@ export interface Notificacao {
   titulo: string;
   mensagem: string;
   tipo: NotificacaoTipo;
-  prioridade: NotificacaoPrioridade;
+  prioridade: "baixa" | "media" | "alta";
   status: NotificacaoStatus;
   criadoEm: string;
+  acao_url?: string | null;
 }
 
 interface NotificacoesContextType {
   notificacoes: Notificacao[];
   unreadCount: number;
+  isLoading: boolean;
   marcarLida: (id: string) => void;
   marcarTodasLidas: () => void;
   adicionarNotificacao: (n: Omit<Notificacao, "id" | "status" | "criadoEm">) => void;
@@ -25,43 +29,98 @@ interface NotificacoesContextType {
 
 const NotificacoesContext = createContext<NotificacoesContextType | null>(null);
 
-const now = () => new Date().toLocaleString("pt-BR");
-
-const seedNotificacoes: Notificacao[] = [
-  { id: "n1", titulo: "Novo agendamento", mensagem: "Maria Silva agendou Consulta Dermatológica para 22/03 às 14:00.", tipo: "agenda", prioridade: "media", status: "nao_lida", criadoEm: "21/03/2026 15:32" },
-  { id: "n2", titulo: "Pagamento recebido", mensagem: "Pagamento de R$ 150,00 via PIX confirmado — Carlos Souza.", tipo: "financeiro", prioridade: "baixa", status: "nao_lida", criadoEm: "21/03/2026 14:50" },
-  { id: "n3", titulo: "Cancelamento de horário", mensagem: "Ana Oliveira cancelou o agendamento de 23/03 às 10:00.", tipo: "agenda", prioridade: "alta", status: "nao_lida", criadoEm: "21/03/2026 14:15" },
-  { id: "n4", titulo: "Falha no envio WhatsApp", mensagem: "Mensagem de lembrete para Pedro Santos falhou após 3 tentativas.", tipo: "whatsapp", prioridade: "alta", status: "nao_lida", criadoEm: "21/03/2026 13:40" },
-  { id: "n5", titulo: "Comissão calculada", mensagem: "Comissões do período 15-21/03 foram calculadas para 3 profissionais.", tipo: "financeiro", prioridade: "baixa", status: "lida", criadoEm: "21/03/2026 12:00" },
-  { id: "n6", titulo: "Novo paciente cadastrado", mensagem: "Beatriz Lima foi cadastrada no sistema pela recepção.", tipo: "sistema", prioridade: "baixa", status: "lida", criadoEm: "21/03/2026 11:30" },
-  { id: "n7", titulo: "Backup realizado", mensagem: "Backup automático do sistema concluído com sucesso.", tipo: "sistema", prioridade: "baixa", status: "lida", criadoEm: "21/03/2026 03:00" },
-  { id: "n8", titulo: "Aviso da administração", mensagem: "Reunião de equipe amanhã às 08:00. Presença obrigatória.", tipo: "administrativo", prioridade: "media", status: "nao_lida", criadoEm: "20/03/2026 18:00" },
-];
-
 export function NotificacoesProvider({ children }: { children: ReactNode }) {
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>(seedNotificacoes);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const unreadCount = notificacoes.filter(n => n.status === "nao_lida").length;
+  // ── Fetch notifications from Supabase ──
+  const { data: rawNotificacoes = [], isLoading } = useQuery({
+    queryKey: ["notificacoes", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from("notificacoes")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
-  const marcarLida = useCallback((id: string) => {
-    setNotificacoes(prev => prev.map(n => n.id === id ? { ...n, status: "lida" as const } : n));
-  }, []);
+  // Map DB rows to context shape
+  const notificacoes: Notificacao[] = rawNotificacoes.map((n) => ({
+    id: n.id,
+    titulo: n.titulo,
+    mensagem: n.conteudo || "",
+    tipo: (n.categoria as NotificacaoTipo) || "sistema",
+    prioridade: "media",
+    status: n.lida ? "lida" : "nao_lida",
+    criadoEm: new Date(n.created_at).toLocaleString("pt-BR"),
+    acao_url: n.acao_url,
+  }));
 
-  const marcarTodasLidas = useCallback(() => {
-    setNotificacoes(prev => prev.map(n => ({ ...n, status: "lida" as const })));
-  }, []);
+  const unreadCount = notificacoes.filter((n) => n.status === "nao_lida").length;
 
-  const adicionarNotificacao = useCallback((n: Omit<Notificacao, "id" | "status" | "criadoEm">) => {
-    const nova: Notificacao = { ...n, id: Date.now().toString(), status: "nao_lida", criadoEm: now() };
-    setNotificacoes(prev => [nova, ...prev]);
-  }, []);
+  // ── Mutations ──
+  const marcarLidaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("notificacoes")
+        .update({ lida: true })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notificacoes"] }),
+  });
 
-  const remover = useCallback((id: string) => {
-    setNotificacoes(prev => prev.filter(n => n.id !== id));
-  }, []);
+  const marcarTodasLidasMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) return;
+      const { error } = await supabase
+        .from("notificacoes")
+        .update({ lida: true })
+        .eq("user_id", user.id)
+        .eq("lida", false);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notificacoes"] }),
+  });
+
+  const adicionarMutation = useMutation({
+    mutationFn: async (n: Omit<Notificacao, "id" | "status" | "criadoEm">) => {
+      if (!user?.id) return;
+      const { error } = await supabase.from("notificacoes").insert({
+        user_id: user.id,
+        titulo: n.titulo,
+        conteudo: n.mensagem,
+        tipo: "info",
+        categoria: n.tipo,
+        lida: false,
+        acao_url: n.acao_url,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notificacoes"] }),
+  });
+
+  const removerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("notificacoes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notificacoes"] }),
+  });
+
+  const marcarLida = useCallback((id: string) => marcarLidaMutation.mutate(id), [marcarLidaMutation]);
+  const marcarTodasLidas = useCallback(() => marcarTodasLidasMutation.mutate(), [marcarTodasLidasMutation]);
+  const adicionarNotificacao = useCallback((n: Omit<Notificacao, "id" | "status" | "criadoEm">) => adicionarMutation.mutate(n), [adicionarMutation]);
+  const remover = useCallback((id: string) => removerMutation.mutate(id), [removerMutation]);
 
   return (
-    <NotificacoesContext.Provider value={{ notificacoes, unreadCount, marcarLida, marcarTodasLidas, adicionarNotificacao, remover }}>
+    <NotificacoesContext.Provider value={{ notificacoes, unreadCount, isLoading, marcarLida, marcarTodasLidas, adicionarNotificacao, remover }}>
       {children}
     </NotificacoesContext.Provider>
   );
