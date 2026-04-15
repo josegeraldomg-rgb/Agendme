@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo-agendme.png";
 
@@ -20,13 +21,25 @@ export default function SaasLoginPage() {
       return;
     }
     setLoading(true);
-    const { error } = await signIn(email, senha);
-    setLoading(false);
-    if (error) {
-      toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Login realizado com sucesso!" });
-      navigate("/saas/dashboard");
+    
+    try {
+      // Forçamos o logout prévio caso uma clínica tenha ficado grudada no cache do navegador
+      await supabase.auth.signOut();
+      
+      const { error } = await signIn(email, senha);
+      if (error) {
+        toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+        setLoading(false);
+      } else {
+        toast({ title: "Login realizado com sucesso!" });
+        // Pequeno delay para os listeners do Supabase terminarem de sincronizar o context
+        setTimeout(() => {
+          navigate("/saas/dashboard");
+        }, 500);
+      }
+    } catch (err: any) {
+      toast({ title: "Erro Crítico", description: err.message, variant: "destructive" });
+      setLoading(false);
     }
   };
 

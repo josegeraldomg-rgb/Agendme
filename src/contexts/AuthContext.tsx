@@ -32,12 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    setProfile(data as Profile | null);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle(); // Usar maybeSingle em vez de single() evita erro 406
+      
+      if (!error && data) {
+        setProfile(data as Profile);
+      } else {
+        setProfile(null);
+      }
+    } catch (err) {
+      console.warn("Erro ao buscar profile", err);
+      setProfile(null);
+    }
   }, []);
 
   const refreshProfile = useCallback(async () => {
