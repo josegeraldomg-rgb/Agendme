@@ -54,9 +54,12 @@ export function useOnboarding() {
 
     try {
       // ── 1. Criar empresa ──────────────────────────────────────────────────
-      const { data: empresaData, error: empresaError } = await supabase
+      const empresaId = crypto.randomUUID(); // Gerado no frontend para não dependermos do retorno barrado pelo RLS
+
+      const { error: empresaError } = await supabase
         .from("empresas")
         .insert({
+          id: empresaId,
           nome: empresa.nome,
           slug: empresa.slug,
           email: empresa.email || null,
@@ -74,9 +77,7 @@ export function useOnboarding() {
           },
           status: "trial",
           plano: "basico",
-        })
-        .select("id")
-        .single();
+        });
 
       if (empresaError) {
         // Slug duplicado é o erro mais comum
@@ -85,8 +86,6 @@ export function useOnboarding() {
         }
         throw empresaError;
       }
-
-      const empresaId = empresaData.id;
 
       // ── 2. Vincular profile → empresa ────────────────────────────────────
       const { error: profileError } = await supabase
