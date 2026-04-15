@@ -23,22 +23,25 @@ export default function SaasLoginPage() {
     setLoading(true);
     
     try {
-      // Forçamos o logout prévio caso uma clínica tenha ficado grudada no cache do navegador
-      await supabase.auth.signOut();
+      console.log("Forçando signOut prévio...");
+      await supabase.auth.signOut().catch(e => console.error("SignOut falhou (ignorado)", e));
       
+      console.log("Chamando signInAuthContext...");
       const { error } = await signIn(email, senha);
+      
+      console.log("SignIn retornou. Erro?", error);
       if (error) {
         toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
         setLoading(false);
       } else {
         toast({ title: "Login realizado com sucesso!" });
-        // Pequeno delay para os listeners do Supabase terminarem de sincronizar o context
         setTimeout(() => {
-          navigate("/saas/dashboard");
+          window.location.href = "/saas/dashboard"; // Forçamos hard-redirect ao invés do React Router p/ limpar qualquer cache
         }, 500);
       }
     } catch (err: any) {
-      toast({ title: "Erro Crítico", description: err.message, variant: "destructive" });
+      console.error("Erro critico capturado:", err);
+      toast({ title: "Erro Crítico", description: err?.message || "Falha desconhecida", variant: "destructive" });
       setLoading(false);
     }
   };
