@@ -1,215 +1,158 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Plus,
-  CalendarOff,
-  Flag,
-  Trash2,
-  Bell,
-  Clock,
-  User,
-  MessageCircle,
-  AlertTriangle,
+  Plus, CalendarOff, Flag, Trash2, Clock, User,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
+import { useAusencias, useCreateAusencia, useDeleteAusencia, useFeriados, useCreateFeriado, useDeleteFeriado } from "@/hooks/use-ausencias";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useEmpresaId } from "@/contexts/EmpresaContext";
 
-/* ── Types ── */
-interface Ausencia {
-  id: string;
-  profissional: string;
-  dataInicio: Date;
-  dataFim: Date;
-  horaInicio?: string;
-  horaFim?: string;
-  diaTodo: boolean;
-  motivo: string;
-  observacao?: string;
-  lembrete: boolean;
-  lembreteAntecedencia?: string;
+const TIPOS_AUSENCIA = [
+  { value: "folga", label: "Folga" },
+  { value: "ferias", label: "Férias" },
+  { value: "bloqueio", label: "Bloqueio" },
+  { value: "outro", label: "Outro" },
+];
+
+function useProfissionais() {
+  const empresaId = useEmpresaId();
+  return useQuery({
+    queryKey: ["profissionais", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+      const { data, error } = await supabase
+        .from("profissionais_clinica")
+        .select("id, nome, ativo")
+        .eq("empresa_id", empresaId)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+  });
 }
-
-interface Feriado {
-  data: Date;
-  nome: string;
-  nacional: boolean;
-}
-
-/* ── Brazilian holidays 2026 ── */
-const feriadosNacionais2026: Feriado[] = [
-  { data: new Date(2026, 0, 1), nome: "Confraternização Universal", nacional: true },
-  { data: new Date(2026, 1, 16), nome: "Carnaval", nacional: true },
-  { data: new Date(2026, 1, 17), nome: "Carnaval", nacional: true },
-  { data: new Date(2026, 3, 3), nome: "Sexta-feira Santa", nacional: true },
-  { data: new Date(2026, 3, 21), nome: "Tiradentes", nacional: true },
-  { data: new Date(2026, 4, 1), nome: "Dia do Trabalho", nacional: true },
-  { data: new Date(2026, 5, 4), nome: "Corpus Christi", nacional: true },
-  { data: new Date(2026, 8, 7), nome: "Independência do Brasil", nacional: true },
-  { data: new Date(2026, 9, 12), nome: "Nossa Sra. Aparecida", nacional: true },
-  { data: new Date(2026, 10, 2), nome: "Finados", nacional: true },
-  { data: new Date(2026, 10, 15), nome: "Proclamação da República", nacional: true },
-  { data: new Date(2026, 11, 25), nome: "Natal", nacional: true },
-];
-
-const profissionais = [
-  { id: "joao", nome: "Dr. João" },
-  { id: "paula", nome: "Dra. Paula" },
-  { id: "ricardo", nome: "Dr. Ricardo" },
-];
-
-const horarios = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00",
-];
 
 const AusenciasPage = () => {
-  const { toast } = useToast();
+  const { data: ausencias, isLoading: loadingAus } = useAusencias();
+  const { data: feriados, isLoading: loadingFer } = useFeriados();
+  const { data: profissionais } = useProfissionais();
+  const createAusencia = useCreateAusencia();
+  const deleteAusencia = useDeleteAusencia();
+  const createFeriado = useCreateFeriado();
+  const deleteFeriado = useDeleteFeriado();
 
-  /* ── Absences state ── */
-  const [ausencias, setAusencias] = useState<Ausencia[]>([
-    {
-      id: "1",
-      profissional: "joao",
-      dataInicio: new Date(2026, 2, 25),
-      dataFim: new Date(2026, 2, 25),
-      horaInicio: "14:00",
-      horaFim: "17:00",
-      diaTodo: false,
-      motivo: "Compromisso pessoal",
-      observacao: "Consulta médica",
-      lembrete: true,
-      lembreteAntecedencia: "1h",
-    },
-    {
-      id: "2",
-      profissional: "paula",
-      dataInicio: new Date(2026, 2, 28),
-      dataFim: new Date(2026, 2, 30),
-      diaTodo: true,
-      motivo: "Viagem",
-      observacao: "Congresso de medicina",
-      lembrete: true,
-      lembreteAntecedencia: "1d",
-    },
-  ]);
-
-  /* ── Holidays state ── */
-  const [feriadosAtivos, setFeriadosAtivos] = useState(true);
-  const [feriadosCustom, setFeriadosCustom] = useState<Feriado[]>([]);
-
-  /* ── New absence form ── */
+  // ── Absence form ──
   const [openDialog, setOpenDialog] = useState(false);
-  const [novoProfissional, setNovoProfissional] = useState("");
-  const [novaDataInicio, setNovaDataInicio] = useState<Date | undefined>();
-  const [novaDataFim, setNovaDataFim] = useState<Date | undefined>();
-  const [novoDiaTodo, setNovoDiaTodo] = useState(true);
-  const [novaHoraInicio, setNovaHoraInicio] = useState("08:00");
-  const [novaHoraFim, setNovaHoraFim] = useState("18:00");
-  const [novoMotivo, setNovoMotivo] = useState("");
-  const [novaObservacao, setNovaObservacao] = useState("");
-  const [novoLembrete, setNovoLembrete] = useState(false);
-  const [novaAntecedencia, setNovaAntecedencia] = useState("1h");
+  const [formProf, setFormProf] = useState("");
+  const [formDataInicio, setFormDataInicio] = useState<Date | undefined>();
+  const [formDataFim, setFormDataFim] = useState<Date | undefined>();
+  const [formDiaTodo, setFormDiaTodo] = useState(true);
+  const [formHoraInicio, setFormHoraInicio] = useState("08:00");
+  const [formHoraFim, setFormHoraFim] = useState("18:00");
+  const [formMotivo, setFormMotivo] = useState("");
+  const [formTipo, setFormTipo] = useState("folga");
 
-  /* ── New custom holiday form ── */
+  // ── Holiday form ──
   const [openFeriadoDialog, setOpenFeriadoDialog] = useState(false);
-  const [novoFeriadoData, setNovoFeriadoData] = useState<Date | undefined>();
-  const [novoFeriadoNome, setNovoFeriadoNome] = useState("");
+  const [feriadoData, setFeriadoData] = useState<Date | undefined>();
+  const [feriadoNome, setFeriadoNome] = useState("");
+  const [feriadoRecorrente, setFeriadoRecorrente] = useState(false);
 
   const resetForm = () => {
-    setNovoProfissional("");
-    setNovaDataInicio(undefined);
-    setNovaDataFim(undefined);
-    setNovoDiaTodo(true);
-    setNovaHoraInicio("08:00");
-    setNovaHoraFim("18:00");
-    setNovoMotivo("");
-    setNovaObservacao("");
-    setNovoLembrete(false);
-    setNovaAntecedencia("1h");
+    setFormProf("");
+    setFormDataInicio(undefined);
+    setFormDataFim(undefined);
+    setFormDiaTodo(true);
+    setFormHoraInicio("08:00");
+    setFormHoraFim("18:00");
+    setFormMotivo("");
+    setFormTipo("folga");
   };
 
   const handleSaveAusencia = () => {
-    if (!novoProfissional || !novaDataInicio || !novoMotivo) {
+    if (!formProf || !formDataInicio || !formMotivo) {
       toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
-    const nova: Ausencia = {
-      id: Date.now().toString(),
-      profissional: novoProfissional,
-      dataInicio: novaDataInicio,
-      dataFim: novaDataFim || novaDataInicio,
-      diaTodo: novoDiaTodo,
-      horaInicio: novoDiaTodo ? undefined : novaHoraInicio,
-      horaFim: novoDiaTodo ? undefined : novaHoraFim,
-      motivo: novoMotivo,
-      observacao: novaObservacao || undefined,
-      lembrete: novoLembrete,
-      lembreteAntecedencia: novoLembrete ? novaAntecedencia : undefined,
-    };
-    setAusencias((prev) => [...prev, nova]);
-    toast({ title: "Ausência registrada com sucesso" });
-    if (novoLembrete) {
-      toast({
-        title: "Lembrete WhatsApp configurado",
-        description: `O profissional receberá um lembrete ${novaAntecedencia === "1h" ? "1 hora" : novaAntecedencia === "2h" ? "2 horas" : novaAntecedencia === "1d" ? "1 dia" : "30 minutos"} antes.`,
-      });
-    }
-    resetForm();
-    setOpenDialog(false);
-  };
-
-  const handleRemoveAusencia = (id: string) => {
-    setAusencias((prev) => prev.filter((a) => a.id !== id));
-    toast({ title: "Ausência removida" });
+    const dataFim = formDataFim || formDataInicio;
+    createAusencia.mutate(
+      {
+        profissional_id: formProf,
+        data_inicio: format(formDataInicio, "yyyy-MM-dd"),
+        data_fim: format(dataFim, "yyyy-MM-dd"),
+        dia_todo: formDiaTodo,
+        hora_inicio: formDiaTodo ? null : formHoraInicio,
+        hora_fim: formDiaTodo ? null : formHoraFim,
+        motivo: formMotivo,
+        tipo: formTipo,
+      },
+      {
+        onSuccess: () => {
+          resetForm();
+          setOpenDialog(false);
+        },
+      }
+    );
   };
 
   const handleSaveFeriado = () => {
-    if (!novoFeriadoData || !novoFeriadoNome) {
+    if (!feriadoData || !feriadoNome) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
-    setFeriadosCustom((prev) => [
-      ...prev,
-      { data: novoFeriadoData, nome: novoFeriadoNome, nacional: false },
-    ]);
-    toast({ title: "Feriado adicionado" });
-    setNovoFeriadoData(undefined);
-    setNovoFeriadoNome("");
-    setOpenFeriadoDialog(false);
+    createFeriado.mutate(
+      {
+        data: format(feriadoData, "yyyy-MM-dd"),
+        nome: feriadoNome,
+        recorrente: feriadoRecorrente,
+      },
+      {
+        onSuccess: () => {
+          setFeriadoData(undefined);
+          setFeriadoNome("");
+          setFeriadoRecorrente(false);
+          setOpenFeriadoDialog(false);
+        },
+      }
+    );
   };
 
-  const handleRemoveFeriado = (idx: number) => {
-    setFeriadosCustom((prev) => prev.filter((_, i) => i !== idx));
-    toast({ title: "Feriado removido" });
-  };
-
-  const todosOsFeriados = feriadosAtivos
-    ? [...feriadosNacionais2026, ...feriadosCustom].sort((a, b) => a.data.getTime() - b.data.getTime())
-    : [...feriadosCustom].sort((a, b) => a.data.getTime() - b.data.getTime());
-
-  const getNomeProfissional = (id: string) =>
-    profissionais.find((p) => p.id === id)?.nome || id;
-
-  const formatDateRange = (a: Ausencia) => {
-    const inicio = format(a.dataInicio, "dd/MM/yyyy", { locale: ptBR });
-    const fim = format(a.dataFim, "dd/MM/yyyy", { locale: ptBR });
+  const formatDateRange = (a: NonNullable<typeof ausencias>[0]) => {
+    const inicio = format(new Date(a.data_inicio), "dd/MM/yyyy", { locale: ptBR });
+    const fim = format(new Date(a.data_fim), "dd/MM/yyyy", { locale: ptBR });
     if (inicio === fim) {
-      if (a.diaTodo) return `${inicio} — Dia todo`;
-      return `${inicio} — ${a.horaInicio} às ${a.horaFim}`;
+      if (a.dia_todo) return `${inicio} — Dia todo`;
+      return `${inicio} — ${a.hora_inicio || ""} às ${a.hora_fim || ""}`;
     }
-    return `${inicio} a ${fim} — Dia todo`;
+    return `${inicio} a ${fim}`;
   };
+
+  const isLoading = loadingAus || loadingFer;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-80" />
+        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -227,385 +170,266 @@ const AusenciasPage = () => {
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="ausencias" className="gap-2">
             <CalendarOff className="h-4 w-4" />
-            Ausências
+            Ausências ({ausencias?.length || 0})
           </TabsTrigger>
           <TabsTrigger value="feriados" className="gap-2">
             <Flag className="h-4 w-4" />
-            Feriados
+            Feriados ({feriados?.length || 0})
           </TabsTrigger>
         </TabsList>
 
         {/* ═══════ TAB: Ausências ═══════ */}
         <TabsContent value="ausencias" className="space-y-4 mt-4">
           <div className="flex justify-end">
-            <Dialog open={openDialog} onOpenChange={(o) => { setOpenDialog(o); if (!o) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nova Ausência
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Registrar Ausência Programada</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                  {/* Profissional */}
-                  <div className="space-y-2">
-                    <Label>Profissional *</Label>
-                    <Select value={novoProfissional} onValueChange={setNovoProfissional}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profissionais.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Motivo */}
-                  <div className="space-y-2">
-                    <Label>Motivo *</Label>
-                    <Input
-                      placeholder="Ex: Consulta médica, viagem..."
-                      value={novoMotivo}
-                      onChange={(e) => setNovoMotivo(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Dates */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Data Início *</Label>
-                      <div className="border border-input rounded-md">
-                        <Calendar
-                          mode="single"
-                          selected={novaDataInicio}
-                          onSelect={setNovaDataInicio}
-                          locale={ptBR}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Data Fim</Label>
-                      <div className="border border-input rounded-md">
-                        <Calendar
-                          mode="single"
-                          selected={novaDataFim}
-                          onSelect={setNovaDataFim}
-                          locale={ptBR}
-                          disabled={(date) => novaDataInicio ? date < novaDataInicio : false}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dia todo / horário */}
-                  <div className="flex items-center gap-3">
-                    <Switch checked={novoDiaTodo} onCheckedChange={setNovoDiaTodo} id="dia-todo" />
-                    <Label htmlFor="dia-todo">Dia todo</Label>
-                  </div>
-                  {!novoDiaTodo && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Hora Início</Label>
-                        <Select value={novaHoraInicio} onValueChange={setNovaHoraInicio}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {horarios.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Hora Fim</Label>
-                        <Select value={novaHoraFim} onValueChange={setNovaHoraFim}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {horarios.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Observação */}
-                  <div className="space-y-2">
-                    <Label>Observação</Label>
-                    <Textarea
-                      placeholder="Detalhes adicionais..."
-                      value={novaObservacao}
-                      onChange={(e) => setNovaObservacao(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Lembrete WhatsApp */}
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Switch checked={novoLembrete} onCheckedChange={setNovoLembrete} id="lembrete" />
-                        <Label htmlFor="lembrete" className="flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-primary" />
-                          Lembrete via WhatsApp
-                        </Label>
-                      </div>
-                      {novoLembrete && (
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">Antecedência do lembrete</Label>
-                          <Select value={novaAntecedencia} onValueChange={setNovaAntecedencia}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="30m">30 minutos antes</SelectItem>
-                              <SelectItem value="1h">1 hora antes</SelectItem>
-                              <SelectItem value="2h">2 horas antes</SelectItem>
-                              <SelectItem value="1d">1 dia antes</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button onClick={handleSaveAusencia}>Salvar Ausência</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button className="gap-2" onClick={() => { resetForm(); setOpenDialog(true); }}>
+              <Plus className="h-4 w-4" />
+              Nova Ausência
+            </Button>
           </div>
 
-          {/* Lista de ausências */}
-          {ausencias.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <CalendarOff className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-                <p className="text-muted-foreground">Nenhuma ausência programada</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {ausencias.map((a) => (
-                <Card key={a.id} className="border-l-4 border-l-warning">
-                  <CardContent className="py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <User className="h-4 w-4 text-primary" />
-                          <span className="font-semibold text-sm text-foreground">
-                            {getNomeProfissional(a.profissional)}
+          {/* List */}
+          <div className="space-y-3">
+            {(ausencias || []).length === 0 && (
+              <Card className="p-8">
+                <p className="text-sm text-muted-foreground text-center">Nenhuma ausência registrada.</p>
+              </Card>
+            )}
+            {(ausencias || []).map((a) => (
+              <Card key={a.id} className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {a.profissionais_clinica?.nome || "Profissional"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs capitalize">{a.tipo || "folga"}</Badge>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDateRange(a)}
                           </span>
-                          <Badge variant="secondary" className="text-xs">{a.motivo}</Badge>
-                          {a.lembrete && (
-                            <Badge className="text-xs gap-1 bg-primary/10 text-primary border-primary/20">
-                              <Bell className="h-3 w-3" />
-                              Lembrete {a.lembreteAntecedencia}
-                            </Badge>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5" />
-                          {formatDateRange(a)}
-                        </div>
-                        {a.observacao && (
-                          <p className="text-xs text-muted-foreground mt-1">{a.observacao}</p>
+                        {a.motivo && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Motivo: {a.motivo}
+                          </p>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRemoveAusencia(a.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive shrink-0"
+                      onClick={() => deleteAusencia.mutate(a.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
 
         {/* ═══════ TAB: Feriados ═══════ */}
         <TabsContent value="feriados" className="space-y-4 mt-4">
-          {/* Toggle feriados nacionais */}
-          <Card className="border-primary/20">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Flag className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      Bloquear feriados nacionais automaticamente
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Bloqueia a agenda de todos os profissionais nos feriados nacionais de 2026
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={feriadosAtivos}
-                  onCheckedChange={(checked) => {
-                    setFeriadosAtivos(checked);
-                    toast({
-                      title: checked
-                        ? "Feriados nacionais ativados"
-                        : "Feriados nacionais desativados",
-                      description: checked
-                        ? "A agenda será bloqueada automaticamente em todos os feriados nacionais."
-                        : "Os feriados nacionais não bloquearão mais a agenda.",
-                    });
-                  }}
-                  id="feriados-nacionais"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Add custom holiday */}
           <div className="flex justify-end">
-            <Dialog open={openFeriadoDialog} onOpenChange={setOpenFeriadoDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Feriado Personalizado
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-sm">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Feriado</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                  <div className="space-y-2">
-                    <Label>Nome do feriado *</Label>
-                    <Input
-                      placeholder="Ex: Aniversário da cidade"
-                      value={novoFeriadoNome}
-                      onChange={(e) => setNovoFeriadoNome(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Data *</Label>
-                    <div className="border border-input rounded-md">
-                      <Calendar
-                        mode="single"
-                        selected={novoFeriadoData}
-                        onSelect={setNovoFeriadoData}
-                        locale={ptBR}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button onClick={handleSaveFeriado}>Salvar</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button className="gap-2" onClick={() => setOpenFeriadoDialog(true)}>
+              <Plus className="h-4 w-4" />
+              Novo Feriado
+            </Button>
           </div>
 
-          {/* Holiday list */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Feriados de 2026</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {todosOsFeriados.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Nenhum feriado configurado. Ative os feriados nacionais ou adicione um personalizado.
-                </p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {todosOsFeriados.map((f, idx) => {
-                    const isPast = f.data < new Date();
-                    return (
-                      <div
-                        key={`${f.nome}-${idx}`}
-                        className={`flex items-center justify-between py-3 ${isPast ? "opacity-50" : ""}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-destructive/10 flex flex-col items-center justify-center">
-                            <span className="text-[10px] font-semibold text-destructive leading-none">
-                              {format(f.data, "MMM", { locale: ptBR }).toUpperCase()}
-                            </span>
-                            <span className="text-sm font-bold text-destructive leading-none">
-                              {format(f.data, "dd")}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{f.nome}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(f.data, "EEEE", { locale: ptBR })}
-                              {f.nacional && (
-                                <span className="ml-2 text-primary">• Nacional</span>
-                              )}
-                              {!f.nacional && (
-                                <span className="ml-2 text-warning">• Personalizado</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className={isPast ? "" : "bg-destructive/10 text-destructive border-destructive/20"}
-                          >
-                            {isPast ? "Passado" : "Agenda bloqueada"}
-                          </Badge>
-                          {!f.nacional && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                              onClick={() => {
-                                const customIdx = feriadosCustom.findIndex(
-                                  (fc) => fc.nome === f.nome && fc.data.getTime() === f.data.getTime()
-                                );
-                                if (customIdx >= 0) handleRemoveFeriado(customIdx);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+          <div className="space-y-2">
+            {(feriados || []).length === 0 && (
+              <Card className="p-8">
+                <p className="text-sm text-muted-foreground text-center">Nenhum feriado cadastrado.</p>
+              </Card>
+            )}
+            {(feriados || []).map((f) => (
+              <Card key={f.id} className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center">
+                        <Flag className="h-4 w-4 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{f.nome}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(f.data), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                          {f.recorrente && (
+                            <Badge variant="secondary" className="text-[10px]">Recorrente</Badge>
                           )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Info card */}
-          <Card className="border-warning/30 bg-warning/5">
-            <CardContent className="py-4">
-              <div className="flex gap-3">
-                <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Como funciona o bloqueio</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Quando um feriado está ativo, a agenda de <strong>todos os profissionais</strong> da
-                    empresa é bloqueada automaticamente para o dia inteiro. Novos agendamentos não poderão
-                    ser feitos por clientes ou pela recepção nesses dias.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => deleteFeriado.mutate(f.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* ── Ausência Dialog ── */}
+      <Dialog open={openDialog} onOpenChange={(o) => { setOpenDialog(o); if (!o) resetForm(); }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Ausência Programada</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Profissional *</Label>
+              <Select value={formProf} onValueChange={setFormProf}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o profissional" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(profissionais || []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={formTipo} onValueChange={setFormTipo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_AUSENCIA.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Motivo *</Label>
+                <Input
+                  placeholder="Ex: Consulta médica..."
+                  value={formMotivo}
+                  onChange={(e) => setFormMotivo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data Início *</Label>
+                <div className="border border-input rounded-md">
+                  <Calendar
+                    mode="single"
+                    selected={formDataInicio}
+                    onSelect={setFormDataInicio}
+                    locale={ptBR}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Data Fim</Label>
+                <div className="border border-input rounded-md">
+                  <Calendar
+                    mode="single"
+                    selected={formDataFim}
+                    onSelect={setFormDataFim}
+                    locale={ptBR}
+                    disabled={(date) => formDataInicio ? date < formDataInicio : false}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Dia todo</p>
+                <p className="text-xs text-muted-foreground">Bloquear o dia inteiro</p>
+              </div>
+              <Switch checked={formDiaTodo} onCheckedChange={setFormDiaTodo} />
+            </div>
+
+            {!formDiaTodo && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Hora Início</Label>
+                  <Input type="time" value={formHoraInicio} onChange={(e) => setFormHoraInicio(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Hora Fim</Label>
+                  <Input type="time" value={formHoraFim} onChange={(e) => setFormHoraFim(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveAusencia} disabled={createAusencia.isPending}>
+              {createAusencia.isPending ? "Salvando..." : "Registrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Feriado Dialog ── */}
+      <Dialog open={openFeriadoDialog} onOpenChange={setOpenFeriadoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Feriado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome *</Label>
+              <Input
+                placeholder="Ex: Aniversário da cidade"
+                value={feriadoNome}
+                onChange={(e) => setFeriadoNome(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data *</Label>
+              <div className="border border-input rounded-md">
+                <Calendar
+                  mode="single"
+                  selected={feriadoData}
+                  onSelect={setFeriadoData}
+                  locale={ptBR}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Recorrente</p>
+                <p className="text-xs text-muted-foreground">Repetir todos os anos</p>
+              </div>
+              <Switch checked={feriadoRecorrente} onCheckedChange={setFeriadoRecorrente} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenFeriadoDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveFeriado} disabled={createFeriado.isPending}>
+              {createFeriado.isPending ? "Salvando..." : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
