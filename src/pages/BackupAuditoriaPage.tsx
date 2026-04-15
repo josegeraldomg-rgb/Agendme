@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -15,6 +16,8 @@ import {
   CheckCircle2, XCircle, Search, FileText, Plus, Eye, Trash2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuditLog } from "@/hooks/use-relatorios";
+
 
 // --- Mock Data ---
 const backupsMock = [
@@ -64,11 +67,25 @@ export default function BackupAuditoriaPage() {
   const [restoreDialog, setRestoreDialog] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
 
-  const filteredLogs = auditoriaLogsMock.filter(l => {
+  const { data: auditLogsReal = [], isLoading: loadingAudit } = useAuditLog(100, filterModulo !== "todos" ? filterModulo : undefined);
+
+  // Use real logs if available, else fallback to mock for UI demonstration
+  const logsSource = auditLogsReal.length > 0 ? auditLogsReal.map(l => ({
+    id: l.id,
+    usuario: l.user_id ? l.user_id.slice(0, 8) + "..." : "Sistema",
+    modulo: l.tabela || l.origem || "sistema",
+    acao: l.acao,
+    detalhe: l.acao,
+    ip: l.ip || "—",
+    data: l.created_at,
+  })) : auditoriaLogsMock;
+
+  const filteredLogs = logsSource.filter(l => {
     const matchSearch = !searchAudit || l.detalhe.toLowerCase().includes(searchAudit.toLowerCase()) || l.usuario.toLowerCase().includes(searchAudit.toLowerCase());
-    const matchModulo = filterModulo === "todos" || l.modulo.toLowerCase() === filterModulo;
+    const matchModulo = filterModulo === "todos" || l.modulo.toLowerCase() === filterModulo.toLowerCase();
     return matchSearch && matchModulo;
   });
+
 
   const handleBackupManual = () => {
     toast.success("Backup manual iniciado com sucesso!");
@@ -95,8 +112,9 @@ export default function BackupAuditoriaPage() {
           { title: "Backups Realizados", value: "127", icon: Database, desc: "Últimos 30 dias" },
           { title: "Último Backup", value: "Hoje 02:00", icon: Clock, desc: "Automático - Global" },
           { title: "Armazenamento", value: "12.4 GB", icon: HardDrive, desc: "Total utilizado" },
-          { title: "Logs Registrados", value: "4.832", icon: Shield, desc: "Últimos 30 dias" },
+          { title: "Logs Registrados", value: String(auditLogsReal.length || "—"), icon: Shield, desc: "Últimos 30 dias" },
         ].map(k => (
+
           <Card key={k.title}>
             <CardContent className="p-5">
               <div className="flex items-center justify-between">

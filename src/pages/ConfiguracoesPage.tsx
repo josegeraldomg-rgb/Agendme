@@ -27,7 +27,7 @@ const temasPredefinidos: { nome: string; config: Partial<WhiteLabelConfig> }[] =
 ];
 
 const ConfiguracoesPage = () => {
-  const { config, updateConfig, resetToDefault, applyTheme } = useWhiteLabel();
+  const { config, updateConfig, resetToDefault, applyTheme, saveConfig, isSaving } = useWhiteLabel();
   const { empresa } = useEmpresa();
   const [activeTab, setActiveTab] = useState("cores");
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
@@ -57,7 +57,9 @@ const ConfiguracoesPage = () => {
           <Button variant="outline" size="sm" onClick={resetToDefault} className="gap-1">
             <RotateCcw className="h-4 w-4" /> Restaurar Padrão
           </Button>
-          <Button className="gap-2"><Save className="h-4 w-4" /> Salvar Alterações</Button>
+          <Button className="gap-2" onClick={saveConfig} disabled={isSaving}>
+            <Save className="h-4 w-4" /> {isSaving ? "Salvando..." : "Salvar Alterações"}
+          </Button>
         </div>
       </div>
 

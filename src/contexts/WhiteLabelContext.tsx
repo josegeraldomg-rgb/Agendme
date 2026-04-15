@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useEmpresaId } from "@/contexts/EmpresaContext";
+import { toast } from "@/hooks/use-toast";
 
 export interface WhiteLabelConfig {
   empresaId: string;
@@ -14,14 +18,17 @@ export interface WhiteLabelConfig {
 
 interface WhiteLabelContextType {
   config: WhiteLabelConfig;
+  isLoading: boolean;
   updateConfig: (patch: Partial<WhiteLabelConfig>) => void;
+  saveConfig: () => void;
   resetToDefault: () => void;
   applyTheme: (config: WhiteLabelConfig) => void;
+  isSaving: boolean;
 }
 
-const defaultConfig: WhiteLabelConfig = {
-  empresaId: "e1",
-  nomeExibicao: "Clínica Beleza Pura",
+export const defaultConfig: WhiteLabelConfig = {
+  empresaId: "",
+  nomeExibicao: "",
   corPrimaria: "#0EA5E9",
   corSecundaria: "#E0F2FE",
   corTexto: "#1E293B",
@@ -54,49 +61,104 @@ function hexToHsl(hex: string): string {
 
 function applyCSS(cfg: WhiteLabelConfig) {
   const root = document.documentElement;
-  if (cfg.corPrimaria) {
+  if (cfg.corPrimaria && /^#[0-9A-Fa-f]{6}$/.test(cfg.corPrimaria)) {
     root.style.setProperty("--primary", hexToHsl(cfg.corPrimaria));
     root.style.setProperty("--ring", hexToHsl(cfg.corPrimaria));
     root.style.setProperty("--sidebar-primary", hexToHsl(cfg.corPrimaria));
   }
-  if (cfg.corSecundaria) {
+  if (cfg.corSecundaria && /^#[0-9A-Fa-f]{6}$/.test(cfg.corSecundaria)) {
     root.style.setProperty("--accent", hexToHsl(cfg.corSecundaria));
   }
-  if (cfg.corFundo) {
+  if (cfg.corFundo && /^#[0-9A-Fa-f]{6}$/.test(cfg.corFundo)) {
     root.style.setProperty("--background", hexToHsl(cfg.corFundo));
   }
-  if (cfg.corTexto) {
+  if (cfg.corTexto && /^#[0-9A-Fa-f]{6}$/.test(cfg.corTexto)) {
     root.style.setProperty("--foreground", hexToHsl(cfg.corTexto));
   }
 }
 
 export function WhiteLabelProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<WhiteLabelConfig>(defaultConfig);
+  const empresaId = useEmpresaId();
+  const queryClient = useQueryClient();
+  const [localConfig, setLocalConfig] = useState<WhiteLabelConfig>(defaultConfig);
 
-  useEffect(() => { applyCSS(config); }, [config]);
+  // ── Load from Supabase (empresas.white_label) ──
+  const { isLoading } = useQuery({
+    queryKey: ["white_label", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return null;
+      const { data, error } = await supabase
+        .from("empresas")
+        .select("id, nome, white_label")
+        .eq("id", empresaId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+    onSuccess: (data: { id: string; nome: string; white_label?: Record<string, unknown> } | null) => {
+      if (!data) return;
+      const wl = data.white_label as Partial<WhiteLabelConfig> | null;
+      const merged: WhiteLabelConfig = {
+        ...defaultConfig,
+        ...(wl || {}),
+        empresaId: data.id,
+        nomeExibicao: (wl as { nomeExibicao?: string })?.nomeExibicao || data.nome || "",
+      };
+      setLocalConfig(merged);
+      applyCSS(merged);
+    },
+  } as Parameters<typeof useQuery>[0]);
+
+  // ── Save to Supabase ──
+  const saveMutation = useMutation({
+    mutationFn: async (cfg: WhiteLabelConfig) => {
+      if (!empresaId) throw new Error("Empresa não selecionada");
+      const { error } = await supabase
+        .from("empresas")
+        .update({ white_label: cfg as unknown as Record<string, unknown>, nome: cfg.nomeExibicao || undefined })
+        .eq("id", empresaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["white_label"] });
+      toast({ title: "Configurações salvas!" });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+  });
+
+  useEffect(() => { applyCSS(localConfig); }, [localConfig]);
 
   const updateConfig = useCallback((patch: Partial<WhiteLabelConfig>) => {
-    setConfig(prev => ({ ...prev, ...patch }));
+    setLocalConfig(prev => ({ ...prev, ...patch }));
   }, []);
 
+  const saveConfig = useCallback(() => {
+    saveMutation.mutate(localConfig);
+  }, [localConfig, saveMutation]);
+
   const resetToDefault = useCallback(() => {
-    setConfig(defaultConfig);
-    // Reset CSS vars
+    setLocalConfig(prev => ({ ...defaultConfig, empresaId: prev.empresaId }));
     const root = document.documentElement;
-    root.style.removeProperty("--primary");
-    root.style.removeProperty("--ring");
-    root.style.removeProperty("--sidebar-primary");
-    root.style.removeProperty("--accent");
-    root.style.removeProperty("--background");
-    root.style.removeProperty("--foreground");
+    ["--primary", "--ring", "--sidebar-primary", "--accent", "--background", "--foreground"].forEach(
+      v => root.style.removeProperty(v)
+    );
   }, []);
 
   const applyTheme = useCallback((cfg: WhiteLabelConfig) => {
-    setConfig(cfg);
+    setLocalConfig(cfg);
   }, []);
 
   return (
-    <WhiteLabelContext.Provider value={{ config, updateConfig, resetToDefault, applyTheme }}>
+    <WhiteLabelContext.Provider value={{
+      config: localConfig,
+      isLoading,
+      updateConfig,
+      saveConfig,
+      resetToDefault,
+      applyTheme,
+      isSaving: saveMutation.isPending,
+    }}>
       {children}
     </WhiteLabelContext.Provider>
   );
@@ -107,5 +169,3 @@ export function useWhiteLabel() {
   if (!ctx) throw new Error("useWhiteLabel must be used within WhiteLabelProvider");
   return ctx;
 }
-
-export { defaultConfig };

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart3, TrendingUp, TrendingDown, Users, Calendar, DollarSign,
   Download, FileText, FileSpreadsheet, FileDown, Activity, Target,
@@ -15,6 +16,8 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   LineChart, Line, PieChart as RechartsPie, Pie, Cell, AreaChart, Area, Legend,
 } from "recharts";
+import { useRelatoriosKpis, useReceitaMensal, useDesempenhoProfissionais } from "@/hooks/use-relatorios";
+
 
 // --- Mock Data ---
 const receitaMensal = [
@@ -105,6 +108,22 @@ function KpiCard({ title, value, change, positive, icon: Icon }: {
 
 export default function RelatoriosPage() {
   const [periodo, setPeriodo] = useState("mensal");
+  const { data: kpis, isLoading: kpisLoading } = useRelatoriosKpis();
+  const { data: receitaMensalData = receitaMensal } = useReceitaMensal();
+  const { data: profsData } = useDesempenhoProfissionais();
+
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const pct = (a: number, b: number) => b === 0 ? "0%" : `${((a - b) / b * 100).toFixed(1)}%`;
+  const positivo = (a: number, b: number) => a >= b;
+
+  const chartData = receitaMensalData.length > 0 ? receitaMensalData : receitaMensal;
+  const profsDisplay = profsData && profsData.length > 0 ? profsData.map(p => ({
+    nome: p.nome,
+    atendimentos: p.atendimentos,
+    receita: 0, // receita por profissional requires join with financeiro_receitas (Épico futura)
+    comissao: 0,
+    taxa: p.atendimentos > 0 ? Math.round((p.atendimentos / (p.atendimentos + p.cancelamentos + 1)) * 100) : 0,
+  })) : profissionaisDesempenho;
 
   return (
     <div className="space-y-6">
@@ -132,10 +151,42 @@ export default function RelatoriosPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Receita Total" value="R$ 297.100" change="+12.4%" positive icon={DollarSign} />
-        <KpiCard title="Atendimentos" value="483" change="+8.2%" positive icon={Activity} />
-        <KpiCard title="Pacientes Ativos" value="367" change="+11.5%" positive icon={Users} />
-        <KpiCard title="Taxa Ocupação" value="84%" change="-2.1%" positive={false} icon={Target} />
+        {kpisLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
+          ))
+        ) : (
+          <>
+            <KpiCard
+              title="Receita Total"
+              value={fmt(kpis?.receitaMes || 0)}
+              change={pct(kpis?.receitaMes || 0, kpis?.receitaMesAnterior || 0)}
+              positive={positivo(kpis?.receitaMes || 0, kpis?.receitaMesAnterior || 0)}
+              icon={DollarSign}
+            />
+            <KpiCard
+              title="Agendamentos"
+              value={String(kpis?.agendamentosMes || 0)}
+              change={pct(kpis?.agendamentosMes || 0, kpis?.agendamentosMesAnterior || 0)}
+              positive={positivo(kpis?.agendamentosMes || 0, kpis?.agendamentosMesAnterior || 0)}
+              icon={Activity}
+            />
+            <KpiCard
+              title="Pacientes Ativos"
+              value={String(kpis?.totalPacientes || 0)}
+              change=""
+              positive
+              icon={Users}
+            />
+            <KpiCard
+              title="Cancelamentos"
+              value={String(kpis?.cancelamentos || 0)}
+              change=""
+              positive={false}
+              icon={Target}
+            />
+          </>
+        )}
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-4">
