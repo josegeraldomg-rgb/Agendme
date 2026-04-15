@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,133 +10,203 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import {
-  Plus, MoreHorizontal, Pencil, Trash2, Image as ImageIcon, X,
-  Clock, DollarSign, Users, MessageSquare, FolderOpen, ChevronDown, ChevronRight, Camera,
+  Plus, Pencil, Trash2,
+  Clock, Users, FolderOpen, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useServicos, useCategorias, useCreateServico, useUpdateServico } from "@/hooks/use-servicos";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useEmpresaId } from "@/contexts/EmpresaContext";
 
-// ── Types ──
+// ── Hooks for categories and profissional_servicos ──
 
-interface Profissional {
-  id: string;
-  nome: string;
-  avatar: string;
+function useCreateCategoria() {
+  const queryClient = useQueryClient();
+  const empresaId = useEmpresaId();
+  return useMutation({
+    mutationFn: async (cat: { nome: string; descricao?: string }) => {
+      if (!empresaId) throw new Error("Empresa não selecionada");
+      const { data, error } = await supabase
+        .from("categorias_servicos")
+        .insert({ ...cat, empresa_id: empresaId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias_servicos"] });
+      toast({ title: "Categoria criada!" });
+    },
+    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
 }
 
-interface ProfissionalVinculado {
-  profissionalId: string;
-  precoPersonalizado?: number;
-  duracaoPersonalizada?: number;
+function useUpdateCategoria() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; nome?: string; descricao?: string }) => {
+      const { data, error } = await supabase
+        .from("categorias_servicos")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias_servicos"] });
+      toast({ title: "Categoria atualizada!" });
+    },
+    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
 }
 
-interface Servico {
-  id: string;
-  categoriaId: string;
-  nome: string;
-  descricao: string;
-  duracao: number;
-  preco: number;
-  ativo: boolean;
-  whatsappOnly: boolean;
-  orientacoesCliente: string;
-  fotos: string[];
-  profissionais: ProfissionalVinculado[];
+function useDeleteCategoria() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("categorias_servicos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias_servicos"] });
+      toast({ title: "Categoria removida!" });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
+  });
 }
 
-interface Categoria {
-  id: string;
-  nome: string;
-  descricao: string;
+function useDeleteServico() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("servicos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["servicos"] });
+      toast({ title: "Serviço removido!" });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao remover", description: e.message, variant: "destructive" }),
+  });
 }
 
-// ── Mock Data ──
+function useProfissionais() {
+  const empresaId = useEmpresaId();
+  return useQuery({
+    queryKey: ["profissionais", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+      const { data, error } = await supabase
+        .from("profissionais_clinica")
+        .select("id, nome, avatar_url, ativo")
+        .eq("empresa_id", empresaId)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+  });
+}
 
-const mockProfissionais: Profissional[] = [
-  { id: "p1", nome: "Dra. Ana Silva", avatar: "AS" },
-  { id: "p2", nome: "Dr. Carlos Mendes", avatar: "CM" },
-  { id: "p3", nome: "Dra. Mariana Costa", avatar: "MC" },
-];
+function useProfissionalServicos(servicoId?: string) {
+  return useQuery({
+    queryKey: ["profissional_servicos", servicoId],
+    queryFn: async () => {
+      if (!servicoId) return [];
+      const { data, error } = await supabase
+        .from("profissional_servicos")
+        .select("*")
+        .eq("servico_id", servicoId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!servicoId,
+  });
+}
 
-const initialCategorias: Categoria[] = [
-  { id: "cat1", nome: "Consultas", descricao: "Consultas médicas e retornos" },
-  { id: "cat2", nome: "Fisioterapia", descricao: "Sessões de fisioterapia e avaliação" },
-  { id: "cat3", nome: "Estética", descricao: "Procedimentos estéticos" },
-];
-
-const initialServicos: Servico[] = [
-  {
-    id: "s1", categoriaId: "cat1", nome: "Consulta Inicial", descricao: "Consulta completa com anamnese",
-    duracao: 60, preco: 250, ativo: true, whatsappOnly: false,
-    orientacoesCliente: "Trazer exames recentes e lista de medicamentos em uso.",
-    fotos: [], profissionais: [
-      { profissionalId: "p1", precoPersonalizado: 280, duracaoPersonalizada: 50 },
-      { profissionalId: "p2" },
-    ],
-  },
-  {
-    id: "s2", categoriaId: "cat1", nome: "Retorno", descricao: "Consulta de retorno",
-    duracao: 30, preco: 150, ativo: true, whatsappOnly: false,
-    orientacoesCliente: "", fotos: [], profissionais: [{ profissionalId: "p1" }],
-  },
-  {
-    id: "s3", categoriaId: "cat2", nome: "Sessão Fisioterapia", descricao: "Sessão de fisioterapia convencional",
-    duracao: 50, preco: 180, ativo: true, whatsappOnly: false,
-    orientacoesCliente: "Usar roupa confortável.", fotos: [], profissionais: [{ profissionalId: "p3" }],
-  },
-  {
-    id: "s4", categoriaId: "cat2", nome: "Avaliação Postural", descricao: "Avaliação completa da postura",
-    duracao: 45, preco: 200, ativo: true, whatsappOnly: false,
-    orientacoesCliente: "", fotos: [], profissionais: [{ profissionalId: "p3", precoPersonalizado: 220, duracaoPersonalizada: 60 }],
-  },
-  {
-    id: "s5", categoriaId: "cat3", nome: "Limpeza de Pele", descricao: "Limpeza profunda com extração",
-    duracao: 90, preco: 280, ativo: true, whatsappOnly: false,
-    orientacoesCliente: "Não usar maquiagem no dia do procedimento.",
-    fotos: [], profissionais: [{ profissionalId: "p1" }, { profissionalId: "p2", precoPersonalizado: 250, duracaoPersonalizada: 75 }],
-  },
-  {
-    id: "s6", categoriaId: "cat3", nome: "Peeling", descricao: "Peeling químico facial",
-    duracao: 45, preco: 350, ativo: true, whatsappOnly: true,
-    orientacoesCliente: "Suspender uso de ácidos 7 dias antes.", fotos: [], profissionais: [{ profissionalId: "p1" }],
-  },
-];
+function useSyncProfissionalServicos() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ servicoId, vinculos }: {
+      servicoId: string;
+      vinculos: { profissional_id: string; preco_customizado?: number | null; duracao_customizada?: number | null }[];
+    }) => {
+      // Delete all existing then insert new
+      await supabase.from("profissional_servicos").delete().eq("servico_id", servicoId);
+      if (vinculos.length > 0) {
+        const rows = vinculos.map((v) => ({ ...v, servico_id: servicoId }));
+        const { error } = await supabase.from("profissional_servicos").insert(rows);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profissional_servicos"] });
+    },
+  });
+}
 
 // ── Main Component ──
 
 const ServicosPage = () => {
-  const [categorias, setCategorias] = useState<Categoria[]>(initialCategorias);
-  const [servicos, setServicos] = useState<Servico[]>(initialServicos);
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(categorias.map((c) => c.id)));
+  const { data: categorias, isLoading: loadingCats } = useCategorias();
+  const { data: servicos, isLoading: loadingServicos } = useServicos();
+  const { data: profissionais } = useProfissionais();
+  const createServico = useCreateServico();
+  const updateServico = useUpdateServico();
+  const deleteServico = useDeleteServico();
+  const createCategoria = useCreateCategoria();
+  const updateCategoria = useUpdateCategoria();
+  const deleteCategoria = useDeleteCategoria();
+  const syncVinculos = useSyncProfissionalServicos();
+
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
   // Category dialog
   const [catDialogOpen, setCatDialogOpen] = useState(false);
-  const [editingCat, setEditingCat] = useState<Categoria | null>(null);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catForm, setCatForm] = useState({ nome: "", descricao: "" });
 
   // Service dialog
   const [svcDialogOpen, setSvcDialogOpen] = useState(false);
-  const [editingSvc, setEditingSvc] = useState<Servico | null>(null);
+  const [editingSvcId, setEditingSvcId] = useState<string | null>(null);
   const [svcTab, setSvcTab] = useState("geral");
 
   // Service form state
-  const [svcForm, setSvcForm] = useState<Omit<Servico, "id">>({
-    categoriaId: "", nome: "", descricao: "", duracao: 30, preco: 0,
-    ativo: true, whatsappOnly: false, orientacoesCliente: "", fotos: [], profissionais: [],
+  const [svcForm, setSvcForm] = useState({
+    categoria_id: "", nome: "", descricao: "", duracao_minutos: 30, preco_base: 0,
+    ativo: true, permite_agendamento_online: true,
   });
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Profissional vinculos for service dialog
+  const [vinculos, setVinculos] = useState<
+    { profissional_id: string; preco_customizado?: number | null; duracao_customizada?: number | null }[]
+  >([]);
+
+  const isLoading = loadingCats || loadingServicos;
+
+  // Auto-expand all categories on first load
+  const catIds = useMemo(() => categorias?.map((c) => c.id) || [], [categorias]);
+  if (expandedCats.size === 0 && catIds.length > 0) {
+    setExpandedCats(new Set(catIds));
+  }
 
   // ── Category handlers ──
   const openNewCat = () => {
-    setEditingCat(null);
+    setEditingCatId(null);
     setCatForm({ nome: "", descricao: "" });
     setCatDialogOpen(true);
   };
-  const openEditCat = (cat: Categoria) => {
-    setEditingCat(cat);
-    setCatForm({ nome: cat.nome, descricao: cat.descricao });
+  const openEditCat = (cat: NonNullable<typeof categorias>[0]) => {
+    setEditingCatId(cat.id);
+    setCatForm({ nome: cat.nome, descricao: cat.descricao || "" });
     setCatDialogOpen(true);
   };
   const saveCat = () => {
@@ -144,106 +214,103 @@ const ServicosPage = () => {
       toast({ title: "Nome obrigatório", variant: "destructive" });
       return;
     }
-    if (editingCat) {
-      setCategorias((prev) => prev.map((c) => c.id === editingCat.id ? { ...c, ...catForm } : c));
-      toast({ title: "Categoria atualizada" });
+    if (editingCatId) {
+      updateCategoria.mutate({ id: editingCatId, ...catForm }, { onSuccess: () => setCatDialogOpen(false) });
     } else {
-      const newCat: Categoria = { id: `cat-${Date.now()}`, ...catForm };
-      setCategorias((prev) => [...prev, newCat]);
-      setExpandedCats((prev) => new Set([...prev, newCat.id]));
-      toast({ title: "Categoria criada" });
+      createCategoria.mutate(catForm, { onSuccess: () => setCatDialogOpen(false) });
     }
-    setCatDialogOpen(false);
   };
-  const deleteCat = (id: string) => {
-    const hasServices = servicos.some((s) => s.categoriaId === id);
+  const handleDeleteCat = (id: string) => {
+    const hasServices = (servicos || []).some((s) => s.categoria_id === id);
     if (hasServices) {
       toast({ title: "Categoria possui serviços", description: "Remova os serviços primeiro.", variant: "destructive" });
       return;
     }
-    setCategorias((prev) => prev.filter((c) => c.id !== id));
-    toast({ title: "Categoria removida" });
+    deleteCategoria.mutate(id);
   };
 
   // ── Service handlers ──
   const openNewSvc = (catId?: string) => {
-    setEditingSvc(null);
+    setEditingSvcId(null);
     setSvcForm({
-      categoriaId: catId || categorias[0]?.id || "", nome: "", descricao: "",
-      duracao: 30, preco: 0, ativo: true, whatsappOnly: false,
-      orientacoesCliente: "", fotos: [], profissionais: [],
+      categoria_id: catId || categorias?.[0]?.id || "", nome: "", descricao: "",
+      duracao_minutos: 30, preco_base: 0, ativo: true, permite_agendamento_online: true,
     });
+    setVinculos([]);
     setSvcTab("geral");
     setSvcDialogOpen(true);
   };
-  const openEditSvc = (svc: Servico) => {
-    setEditingSvc(svc);
-    setSvcForm({ ...svc });
+  const openEditSvc = async (svc: NonNullable<typeof servicos>[0]) => {
+    setEditingSvcId(svc.id);
+    setSvcForm({
+      categoria_id: svc.categoria_id || "",
+      nome: svc.nome,
+      descricao: svc.descricao || "",
+      duracao_minutos: svc.duracao_minutos,
+      preco_base: Number(svc.preco_base) || 0,
+      ativo: svc.ativo ?? true,
+      permite_agendamento_online: svc.permite_agendamento_online ?? true,
+    });
+    // Load existing vinculos
+    const { data } = await supabase
+      .from("profissional_servicos")
+      .select("profissional_id, preco_customizado, duracao_customizada")
+      .eq("servico_id", svc.id);
+    setVinculos(
+      (data || []).map((v) => ({
+        profissional_id: v.profissional_id,
+        preco_customizado: v.preco_customizado ? Number(v.preco_customizado) : null,
+        duracao_customizada: v.duracao_customizada,
+      }))
+    );
     setSvcTab("geral");
     setSvcDialogOpen(true);
   };
   const saveSvc = () => {
-    if (!svcForm.nome.trim() || !svcForm.categoriaId) {
+    if (!svcForm.nome.trim() || !svcForm.categoria_id) {
       toast({ title: "Preencha nome e categoria", variant: "destructive" });
       return;
     }
-    if (svcForm.preco <= 0 || svcForm.duracao <= 0) {
+    if (svcForm.preco_base <= 0 || svcForm.duracao_minutos <= 0) {
       toast({ title: "Preço e duração devem ser maiores que zero", variant: "destructive" });
       return;
     }
-    if (editingSvc) {
-      setServicos((prev) => prev.map((s) => s.id === editingSvc.id ? { ...editingSvc, ...svcForm } : s));
-      toast({ title: "Serviço atualizado" });
+    if (editingSvcId) {
+      updateServico.mutate(
+        { id: editingSvcId, ...svcForm },
+        {
+          onSuccess: () => {
+            syncVinculos.mutate({ servicoId: editingSvcId, vinculos });
+            setSvcDialogOpen(false);
+          },
+        }
+      );
     } else {
-      setServicos((prev) => [...prev, { id: `svc-${Date.now()}`, ...svcForm }]);
-      toast({ title: "Serviço criado" });
+      createServico.mutate(svcForm, {
+        onSuccess: (newSvc) => {
+          if (newSvc && vinculos.length > 0) {
+            syncVinculos.mutate({ servicoId: newSvc.id, vinculos });
+          }
+          setSvcDialogOpen(false);
+        },
+      });
     }
-    setSvcDialogOpen(false);
-  };
-  const deleteSvc = (id: string) => {
-    setServicos((prev) => prev.filter((s) => s.id !== id));
-    toast({ title: "Serviço removido" });
-  };
-  const toggleSvcAtivo = (id: string) => {
-    setServicos((prev) => prev.map((s) => s.id === id ? { ...s, ativo: !s.ativo } : s));
-  };
-
-  // ── Photo handlers ──
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setSvcForm((prev) => ({ ...prev, fotos: [...prev.fotos, ev.target?.result as string] }));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-  const removePhoto = (idx: number) => {
-    setSvcForm((prev) => ({ ...prev, fotos: prev.fotos.filter((_, i) => i !== idx) }));
   };
 
   // ── Professional handlers ──
   const toggleProfissional = (profId: string) => {
-    setSvcForm((prev) => {
-      const exists = prev.profissionais.find((p) => p.profissionalId === profId);
-      if (exists) {
-        return { ...prev, profissionais: prev.profissionais.filter((p) => p.profissionalId !== profId) };
-      }
-      return { ...prev, profissionais: [...prev.profissionais, { profissionalId: profId }] };
+    setVinculos((prev) => {
+      const exists = prev.find((p) => p.profissional_id === profId);
+      if (exists) return prev.filter((p) => p.profissional_id !== profId);
+      return [...prev, { profissional_id: profId }];
     });
   };
-  const updateProfPersonalizado = (profId: string, field: "precoPersonalizado" | "duracaoPersonalizada", value: number | undefined) => {
-    setSvcForm((prev) => ({
-      ...prev,
-      profissionais: prev.profissionais.map((p) =>
-        p.profissionalId === profId ? { ...p, [field]: value } : p
-      ),
-    }));
+  const updateProfField = (profId: string, field: "preco_customizado" | "duracao_customizada", value: number | null) => {
+    setVinculos((prev) =>
+      prev.map((p) => (p.profissional_id === profId ? { ...p, [field]: value } : p))
+    );
   };
 
-  // ── Toggle category expand ──
   const toggleCat = (id: string) => {
     setExpandedCats((prev) => {
       const next = new Set(prev);
@@ -251,6 +318,22 @@ const ServicosPage = () => {
       return next;
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32" />)}
+      </div>
+    );
+  }
+
+  const totalServicos = servicos?.length || 0;
+  const totalAtivos = servicos?.filter((s) => s.ativo).length || 0;
+  const totalOnline = servicos?.filter((s) => s.permite_agendamento_online).length || 0;
 
   return (
     <div className="space-y-6">
@@ -276,26 +359,26 @@ const ServicosPage = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">Categorias</p>
-          <p className="text-2xl font-bold text-foreground">{categorias.length}</p>
+          <p className="text-2xl font-bold text-foreground">{categorias?.length || 0}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">Serviços</p>
-          <p className="text-2xl font-bold text-foreground">{servicos.length}</p>
+          <p className="text-2xl font-bold text-foreground">{totalServicos}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-muted-foreground">Ativos</p>
-          <p className="text-2xl font-bold text-primary">{servicos.filter((s) => s.ativo).length}</p>
+          <p className="text-2xl font-bold text-primary">{totalAtivos}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs text-muted-foreground">Só WhatsApp</p>
-          <p className="text-2xl font-bold text-foreground">{servicos.filter((s) => s.whatsappOnly).length}</p>
+          <p className="text-xs text-muted-foreground">Agend. Online</p>
+          <p className="text-2xl font-bold text-foreground">{totalOnline}</p>
         </Card>
       </div>
 
       {/* Categories + Services */}
       <div className="space-y-4">
-        {categorias.map((cat) => {
-          const catServicos = servicos.filter((s) => s.categoriaId === cat.id);
+        {(categorias || []).map((cat) => {
+          const catServicos = (servicos || []).filter((s) => s.categoria_id === cat.id);
           const isExpanded = expandedCats.has(cat.id);
           return (
             <Card key={cat.id} className="animate-fade-in overflow-hidden">
@@ -318,7 +401,7 @@ const ServicosPage = () => {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCat(cat)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteCat(cat.id)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCat(cat.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -329,44 +412,30 @@ const ServicosPage = () => {
                     {catServicos.map((svc) => (
                       <div key={svc.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors group">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {svc.fotos.length > 0 ? (
-                            <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-border">
-                              <img src={svc.fotos[0]} alt="" className="h-full w-full object-cover" />
-                            </div>
-                          ) : (
-                            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium text-foreground truncate">{svc.nome}</p>
-                              {svc.whatsappOnly && (
-                                <Badge variant="outline" className="text-[10px] border-success text-success shrink-0">WhatsApp</Badge>
+                              {!svc.permite_agendamento_online && (
+                                <Badge variant="outline" className="text-[10px] border-warning text-warning shrink-0">Só presencial</Badge>
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-0.5">
                               <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> {svc.duracao}min
+                                <Clock className="h-3 w-3" /> {svc.duracao_minutos}min
                               </span>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Users className="h-3 w-3" /> {svc.profissionais.length}
-                              </span>
-                              {svc.orientacoesCliente && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <MessageSquare className="h-3 w-3" /> Orientações
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-sm font-semibold text-foreground">R$ {svc.preco.toFixed(2)}</span>
-                          <Switch checked={svc.ativo} onCheckedChange={() => toggleSvcAtivo(svc.id)} />
+                          <span className="text-sm font-semibold text-foreground">R$ {Number(svc.preco_base || 0).toFixed(2)}</span>
+                          <Switch
+                            checked={svc.ativo ?? true}
+                            onCheckedChange={(v) => updateServico.mutate({ id: svc.id, ativo: v })}
+                          />
                           <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => openEditSvc(svc)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteSvc(svc.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteServico.mutate(svc.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -389,7 +458,7 @@ const ServicosPage = () => {
       <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingCat ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
+            <DialogTitle>{editingCatId ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -403,7 +472,9 @@ const ServicosPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCatDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={saveCat}>{editingCat ? "Salvar" : "Criar"}</Button>
+            <Button onClick={saveCat} disabled={createCategoria.isPending || updateCategoria.isPending}>
+              {editingCatId ? "Salvar" : "Criar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -412,15 +483,14 @@ const ServicosPage = () => {
       <Dialog open={svcDialogOpen} onOpenChange={setSvcDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingSvc ? "Editar Serviço" : "Novo Serviço"}</DialogTitle>
+            <DialogTitle>{editingSvcId ? "Editar Serviço" : "Novo Serviço"}</DialogTitle>
           </DialogHeader>
 
           <Tabs value={svcTab} onValueChange={setSvcTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="geral">Geral</TabsTrigger>
               <TabsTrigger value="profissionais">Profissionais</TabsTrigger>
-              <TabsTrigger value="fotos">Fotos</TabsTrigger>
-              <TabsTrigger value="orientacoes">Orientações</TabsTrigger>
+              <TabsTrigger value="orientacoes">Opções</TabsTrigger>
             </TabsList>
 
             {/* Tab: Geral */}
@@ -432,10 +502,10 @@ const ServicosPage = () => {
                 </div>
                 <div>
                   <Label>Categoria *</Label>
-                  <Select value={svcForm.categoriaId} onValueChange={(v) => setSvcForm((p) => ({ ...p, categoriaId: v }))}>
+                  <Select value={svcForm.categoria_id} onValueChange={(v) => setSvcForm((p) => ({ ...p, categoria_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {categorias.map((c) => (
+                      {(categorias || []).map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
                       ))}
                     </SelectContent>
@@ -449,45 +519,32 @@ const ServicosPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Duração (min) *</Label>
-                  <Input type="number" min={1} value={svcForm.duracao} onChange={(e) => setSvcForm((p) => ({ ...p, duracao: parseInt(e.target.value) || 0 }))} />
+                  <Input type="number" min={1} value={svcForm.duracao_minutos} onChange={(e) => setSvcForm((p) => ({ ...p, duracao_minutos: parseInt(e.target.value) || 0 }))} />
                 </div>
                 <div>
                   <Label>Preço base (R$) *</Label>
-                  <Input type="number" min={0} step={0.01} value={svcForm.preco} onChange={(e) => setSvcForm((p) => ({ ...p, preco: parseFloat(e.target.value) || 0 }))} />
+                  <Input type="number" min={0} step={0.01} value={svcForm.preco_base} onChange={(e) => setSvcForm((p) => ({ ...p, preco_base: parseFloat(e.target.value) || 0 }))} />
                 </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Serviço ativo</p>
-                  <p className="text-xs text-muted-foreground">Visível para agendamento</p>
-                </div>
-                <Switch checked={svcForm.ativo} onCheckedChange={(v) => setSvcForm((p) => ({ ...p, ativo: v }))} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Apenas via WhatsApp</p>
-                  <p className="text-xs text-muted-foreground">Cliente agenda apenas pelo WhatsApp</p>
-                </div>
-                <Switch checked={svcForm.whatsappOnly} onCheckedChange={(v) => setSvcForm((p) => ({ ...p, whatsappOnly: v }))} />
               </div>
             </TabsContent>
 
             {/* Tab: Profissionais */}
             <TabsContent value="profissionais" className="space-y-4 mt-4">
               <p className="text-sm text-muted-foreground">
-                Vincule profissionais e defina tempos e preços diferenciados por profissional.
+                Vincule profissionais e defina tempos e preços diferenciados.
               </p>
               <div className="space-y-3">
-                {mockProfissionais.map((prof) => {
-                  const vinculado = svcForm.profissionais.find((p) => p.profissionalId === prof.id);
+                {(profissionais || []).map((prof) => {
+                  const vinculado = vinculos.find((p) => p.profissional_id === prof.id);
                   const isLinked = !!vinculado;
                   return (
                     <div key={prof.id} className={cn("rounded-xl border p-4 transition-all", isLinked ? "border-primary/40 bg-primary/5" : "border-border")}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-primary font-bold text-xs">{prof.avatar}</span>
+                            <span className="text-primary font-bold text-xs">
+                              {prof.nome.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                            </span>
                           </div>
                           <span className="text-sm font-medium text-foreground">{prof.nome}</span>
                         </div>
@@ -499,12 +556,9 @@ const ServicosPage = () => {
                             <Label className="text-xs">Preço personalizado (R$)</Label>
                             <Input
                               type="number" min={0} step={0.01}
-                              placeholder={`Padrão: ${svcForm.preco.toFixed(2)}`}
-                              value={vinculado?.precoPersonalizado ?? ""}
-                              onChange={(e) => {
-                                const val = e.target.value ? parseFloat(e.target.value) : undefined;
-                                updateProfPersonalizado(prof.id, "precoPersonalizado", val);
-                              }}
+                              placeholder={`Padrão: ${svcForm.preco_base.toFixed(2)}`}
+                              value={vinculado?.preco_customizado ?? ""}
+                              onChange={(e) => updateProfField(prof.id, "preco_customizado", e.target.value ? parseFloat(e.target.value) : null)}
                               className="h-9 text-sm"
                             />
                           </div>
@@ -512,12 +566,9 @@ const ServicosPage = () => {
                             <Label className="text-xs">Duração personalizada (min)</Label>
                             <Input
                               type="number" min={1}
-                              placeholder={`Padrão: ${svcForm.duracao}`}
-                              value={vinculado?.duracaoPersonalizada ?? ""}
-                              onChange={(e) => {
-                                const val = e.target.value ? parseInt(e.target.value) : undefined;
-                                updateProfPersonalizado(prof.id, "duracaoPersonalizada", val);
-                              }}
+                              placeholder={`Padrão: ${svcForm.duracao_minutos}`}
+                              value={vinculado?.duracao_customizada ?? ""}
+                              onChange={(e) => updateProfField(prof.id, "duracao_customizada", e.target.value ? parseInt(e.target.value) : null)}
                               className="h-9 text-sm"
                             />
                           </div>
@@ -529,70 +580,31 @@ const ServicosPage = () => {
               </div>
             </TabsContent>
 
-            {/* Tab: Fotos */}
-            <TabsContent value="fotos" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Adicione fotos do serviço, portfólio e registros de antes/depois.
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
-              <div className="grid grid-cols-3 gap-3">
-                {svcForm.fotos.map((foto, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
-                    <img src={foto} alt="" className="h-full w-full object-cover" />
-                    <button
-                      onClick={() => removePhoto(idx)}
-                      className="absolute top-1 right-1 h-6 w-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
-                >
-                  <Camera className="h-6 w-6" />
-                  <span className="text-xs font-medium">Adicionar</span>
-                </button>
-              </div>
-            </TabsContent>
-
-            {/* Tab: Orientações */}
+            {/* Tab: Opções */}
             <TabsContent value="orientacoes" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Instruções enviadas automaticamente ao cliente nos lembretes de WhatsApp.
-              </p>
-              <div>
-                <Label>Orientações ao cliente</Label>
-                <Textarea
-                  value={svcForm.orientacoesCliente}
-                  onChange={(e) => setSvcForm((p) => ({ ...p, orientacoesCliente: e.target.value }))}
-                  placeholder='Ex: "Comparecer de calçado aberto", "Jejum de 8 horas"'
-                  rows={4}
-                />
-              </div>
-              {svcForm.orientacoesCliente && (
-                <div className="rounded-lg bg-muted/60 border border-border p-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Pré-visualização do lembrete:</p>
-                  <p className="text-sm text-foreground">
-                    📋 <strong>Orientações para {svcForm.nome || "seu atendimento"}:</strong>
-                  </p>
-                  <p className="text-sm text-foreground mt-1">{svcForm.orientacoesCliente}</p>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Serviço ativo</p>
+                  <p className="text-xs text-muted-foreground">Visível para agendamento</p>
                 </div>
-              )}
+                <Switch checked={svcForm.ativo} onCheckedChange={(v) => setSvcForm((p) => ({ ...p, ativo: v }))} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Agendamento online</p>
+                  <p className="text-xs text-muted-foreground">Permitir agendamento pelo portal do paciente</p>
+                </div>
+                <Switch checked={svcForm.permite_agendamento_online} onCheckedChange={(v) => setSvcForm((p) => ({ ...p, permite_agendamento_online: v }))} />
+              </div>
             </TabsContent>
           </Tabs>
 
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setSvcDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={saveSvc}>{editingSvc ? "Salvar" : "Criar Serviço"}</Button>
+            <Button onClick={saveSvc} disabled={createServico.isPending || updateServico.isPending}>
+              {editingSvcId ? "Salvar" : "Criar Serviço"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
