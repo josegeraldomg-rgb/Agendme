@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, DollarSign, Users, Clock, Plus, TrendingUp, TrendingDown } from "lucide-react";
+import { Calendar, DollarSign, Users, Clock, Plus } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { useDashboardStats } from "@/hooks/use-faturas";
@@ -21,7 +21,7 @@ const DashboardPage = () => {
   const { empresa } = useEmpresa();
   const { data: stats, isLoading } = useDashboardStats();
   const today = format(new Date(), "yyyy-MM-dd");
-  const { data: agendamentosHoje } = useAgendamentos({ data_aula: today });
+  const { data: agendamentosHoje } = useAgendamentos({ data: today });
 
   return (
     <div className="space-y-6">
@@ -44,7 +44,7 @@ const DashboardPage = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Agendamentos Hoje</p>
                 {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : (
-                  <p className="text-2xl font-bold text-foreground mt-1">{agendamentosHoje?.length || 0}</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">{stats?.agendamentosHoje || 0}</p>
                 )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-accent flex items-center justify-center">
@@ -92,9 +92,9 @@ const DashboardPage = () => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Faturas Pendentes</p>
+                <p className="text-sm text-muted-foreground">Total Agendamentos</p>
                 {isLoading ? <Skeleton className="h-8 w-16 mt-1" /> : (
-                  <p className="text-2xl font-bold text-foreground mt-1">{stats?.faturasPendentes || 0}</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">{stats?.totalAgendamentos || 0}</p>
                 )}
               </div>
               <div className="h-11 w-11 rounded-xl bg-destructive/10 flex items-center justify-center">
@@ -144,23 +144,29 @@ const DashboardPage = () => {
               {(agendamentosHoje || []).length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">Nenhum agendamento hoje</p>
               ) : (
-                (agendamentosHoje || []).slice(0, 5).map((item) => (
+                (agendamentosHoje || []).slice(0, 5).map((item: any) => (
                   <div key={item.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                     <span className="text-sm font-mono font-semibold text-muted-foreground w-12">
-                      {item.horario_inicio?.slice(0, 5)}
+                      {item.hora_inicio?.slice(0, 5)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
-                        {(item as any).turmas?.nome || "Turma"}
+                        {item.clientes?.nome || "Paciente"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.horario_inicio?.slice(0, 5)} — {item.horario_fim?.slice(0, 5)}
+                        {item.servicos?.nome} • {item.profissionais_clinica?.nome}
                       </p>
                     </div>
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      item.status === "confirmado" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+                      item.status === "confirmado" ? "bg-success/15 text-success" :
+                      item.status === "agendado" ? "bg-warning/15 text-warning" :
+                      item.status === "em_atendimento" ? "bg-primary/15 text-primary" :
+                      "bg-muted text-muted-foreground"
                     }`}>
-                      {item.status || "Agendado"}
+                      {item.status === "confirmado" ? "Confirmado" :
+                       item.status === "agendado" ? "Agendado" :
+                       item.status === "em_atendimento" ? "Em atendimento" :
+                       item.status}
                     </span>
                   </div>
                 ))

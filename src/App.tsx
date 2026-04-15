@@ -45,6 +45,7 @@ import SaasLogsPage from "./pages/saas/SaasLogsPage";
 import SaasPermissoesPage from "./pages/saas/SaasPermissoesPage";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
+import OnboardingPage from "./pages/OnboardingPage";
 
 const queryClient = new QueryClient();
 
@@ -59,8 +60,10 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
-            {/* Admin routes - protected */}
-            <Route element={<ProtectedRoute redirectTo="/login"><AppLayout /></ProtectedRoute>}>
+            {/* Onboarding - autenticado mas sem empresa */}
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            {/* Admin routes - protected + empresa obrigatória */}
+            <Route element={<ProtectedRoute requireEmpresa redirectTo="/login"><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/horarios" element={<HorariosPage />} />

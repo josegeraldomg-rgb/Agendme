@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Tables } from "@/integrations/supabase/types";
+
+// Tipo da empresa vindo do Supabase
+type EmpresaRow = Tables<"empresas">;
 
 export interface TenantConfig {
   timezone: string;
@@ -8,115 +14,145 @@ export interface TenantConfig {
 }
 
 export interface TenantLimites {
-  maxUsuarios: number;
-  maxAgendamentosMes: number;
-  armazenamentoMb: number;
-  usoIaHabilitado: boolean;
-  teleconsultaHabilitada: boolean;
-  whatsappHabilitado: boolean;
-}
-
-export interface TenantMetrica {
-  nome: string;
-  valor: number;
-  limite?: number;
+  max_profissionais: number;
+  max_pacientes: number;
+  max_agendamentos_mes: number;
+  whatsapp_habilitado: boolean;
+  teleconsulta_habilitada: boolean;
+  agente_bolso_habilitado: boolean;
 }
 
 export interface Empresa {
   id: string;
   nome: string;
   slug: string;
-  email: string;
-  telefone: string;
+  email: string | null;
+  telefone: string | null;
   plano: string;
-  status: "ativa" | "suspensa" | "cancelada" | "inadimplente";
-  logo?: string;
-  dominio?: string;
-  subdominio?: string;
-  config: TenantConfig;
+  status: string;
+  logo_url: string | null;
+  dominio_customizado: string | null;
+  subdominio: string | null;
+  config: Record<string, unknown>;
   limites: TenantLimites;
-  metricas: TenantMetrica[];
-  criadoEm: string;
+  white_label: Record<string, unknown>;
+  created_at: string;
 }
 
 interface EmpresaContextType {
   empresa: Empresa | null;
+  empresaId: string | null;
+  loading: boolean;
+  error: string | null;
   setEmpresa: (empresa: Empresa | null) => void;
   empresas: Empresa[];
   switchEmpresa: (id: string) => void;
   isTenantActive: () => boolean;
   checkLimit: (resource: keyof TenantLimites, currentUsage?: number) => boolean;
+  refetch: () => void;
 }
 
-const defaultConfig: TenantConfig = {
-  timezone: "America/Sao_Paulo",
-  idioma: "pt-BR",
-  formatoData: "DD/MM/YYYY",
-  moeda: "BRL",
+const defaultLimites: TenantLimites = {
+  max_profissionais: 5,
+  max_pacientes: 100,
+  max_agendamentos_mes: 500,
+  whatsapp_habilitado: false,
+  teleconsulta_habilitada: false,
+  agente_bolso_habilitado: false,
 };
 
-const planLimits: Record<string, TenantLimites> = {
-  Básico: { maxUsuarios: 3, maxAgendamentosMes: 200, armazenamentoMb: 500, usoIaHabilitado: false, teleconsultaHabilitada: false, whatsappHabilitado: true },
-  Profissional: { maxUsuarios: 10, maxAgendamentosMes: 1000, armazenamentoMb: 2000, usoIaHabilitado: true, teleconsultaHabilitada: true, whatsappHabilitado: true },
-  Premium: { maxUsuarios: 50, maxAgendamentosMes: 5000, armazenamentoMb: 10000, usoIaHabilitado: true, teleconsultaHabilitada: true, whatsappHabilitado: true },
-};
+function parseEmpresaRow(row: EmpresaRow): Empresa {
+  return {
+    id: row.id,
+    nome: row.nome,
+    slug: row.slug,
+    email: row.email,
+    telefone: row.telefone,
+    plano: row.plano,
+    status: row.status,
+    logo_url: row.logo_url,
+    dominio_customizado: row.dominio_customizado,
+    subdominio: row.subdominio,
+    config: (row.config as Record<string, unknown>) || {},
+    limites: (row.limites as unknown as TenantLimites) || defaultLimites,
+    white_label: (row.white_label as Record<string, unknown>) || {},
+    created_at: row.created_at,
+  };
+}
 
 const EmpresaContext = createContext<EmpresaContextType | undefined>(undefined);
 
-const mockEmpresas: Empresa[] = [
-  {
-    id: "e1", nome: "Clínica Beleza Pura", slug: "beleza-pura", email: "contato@belezapura.com", telefone: "(11) 3333-4444",
-    plano: "Profissional", status: "ativa", subdominio: "beleza-pura", dominio: "",
-    config: { ...defaultConfig }, limites: planLimits["Profissional"],
-    metricas: [{ nome: "Usuários", valor: 6, limite: 10 }, { nome: "Agendamentos/mês", valor: 342, limite: 1000 }, { nome: "Armazenamento (MB)", valor: 845, limite: 2000 }, { nome: "Pacientes", valor: 245 }],
-    criadoEm: "2026-01-18",
-  },
-  {
-    id: "e2", nome: "Studio Ana Costa", slug: "studio-ana", email: "ana@studio.com", telefone: "(21) 2222-5555",
-    plano: "Básico", status: "ativa", subdominio: "studio-ana", dominio: "",
-    config: { ...defaultConfig }, limites: planLimits["Básico"],
-    metricas: [{ nome: "Usuários", valor: 2, limite: 3 }, { nome: "Agendamentos/mês", valor: 89, limite: 200 }, { nome: "Armazenamento (MB)", valor: 120, limite: 500 }, { nome: "Pacientes", valor: 78 }],
-    criadoEm: "2026-02-10",
-  },
-  {
-    id: "e3", nome: "Estética Renovar", slug: "estetica-renovar", email: "admin@renovar.com", telefone: "(31) 8888-9999",
-    plano: "Premium", status: "ativa", subdominio: "estetica-renovar", dominio: "agenda.renovar.com.br",
-    config: { ...defaultConfig }, limites: planLimits["Premium"],
-    metricas: [{ nome: "Usuários", valor: 18, limite: 50 }, { nome: "Agendamentos/mês", valor: 1850, limite: 5000 }, { nome: "Armazenamento (MB)", valor: 3200, limite: 10000 }, { nome: "Pacientes", valor: 520 }],
-    criadoEm: "2026-03-12",
-  },
-  {
-    id: "e4", nome: "Espaço Zen", slug: "espaco-zen", email: "contato@zen.com", telefone: "(11) 7777-1111",
-    plano: "Básico", status: "inadimplente", subdominio: "espaco-zen", dominio: "",
-    config: { ...defaultConfig }, limites: planLimits["Básico"],
-    metricas: [{ nome: "Usuários", valor: 3, limite: 3 }, { nome: "Agendamentos/mês", valor: 45, limite: 200 }, { nome: "Armazenamento (MB)", valor: 280, limite: 500 }, { nome: "Pacientes", valor: 95 }],
-    criadoEm: "2025-12-05",
-  },
-  {
-    id: "e5", nome: "Clínica Derma+", slug: "derma-plus", email: "adm@dermaplus.com", telefone: "(41) 6666-2222",
-    plano: "Profissional", status: "ativa", subdominio: "derma-plus", dominio: "",
-    config: { ...defaultConfig }, limites: planLimits["Profissional"],
-    metricas: [{ nome: "Usuários", valor: 8, limite: 10 }, { nome: "Agendamentos/mês", valor: 720, limite: 1000 }, { nome: "Armazenamento (MB)", valor: 1500, limite: 2000 }, { nome: "Pacientes", valor: 312 }],
-    criadoEm: "2026-03-08",
-  },
-  {
-    id: "e7", nome: "Clínica Vitalidade", slug: "vitalidade", email: "contato@vitalidade.com", telefone: "(11) 4444-6666",
-    plano: "Premium", status: "ativa", subdominio: "vitalidade", dominio: "",
-    config: { ...defaultConfig }, limites: planLimits["Premium"],
-    metricas: [{ nome: "Usuários", valor: 22, limite: 50 }, { nome: "Agendamentos/mês", valor: 2100, limite: 5000 }, { nome: "Armazenamento (MB)", valor: 4800, limite: 10000 }, { nome: "Pacientes", valor: 680 }],
-    criadoEm: "2026-01-15",
-  },
-];
+export function EmpresaProvider({ children }: { children: ReactNode }) {
+  const { profile } = useAuth();
+  const [empresa, setEmpresa] = useState<Empresa | null>(null);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export function EmpresaProvider({ children, initialEmpresaId }: { children: ReactNode; initialEmpresaId?: string }) {
-  const [empresa, setEmpresa] = useState<Empresa | null>(
-    mockEmpresas.find((e) => e.id === (initialEmpresaId || "e1")) || mockEmpresas[0]
-  );
+  const fetchEmpresa = useCallback(async () => {
+    if (!profile?.empresa_id) {
+      setEmpresa(null);
+      setLoading(false);
+      return;
+    }
 
-  const switchEmpresa = useCallback((id: string) => {
-    const found = mockEmpresas.find((e) => e.id === id);
-    if (found) setEmpresa(found);
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from("empresas")
+        .select("*")
+        .eq("id", profile.empresa_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (data) {
+        setEmpresa(parseEmpresaRow(data));
+      }
+    } catch (err) {
+      console.error("Erro ao buscar empresa:", err);
+      setError(err instanceof Error ? err.message : "Erro ao carregar empresa");
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.empresa_id]);
+
+  // Buscar todas as empresas (para saas_owner)
+  const fetchEmpresas = useCallback(async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("empresas")
+        .select("*")
+        .order("nome");
+
+      if (fetchError) throw fetchError;
+      if (data) {
+        setEmpresas(data.map(parseEmpresaRow));
+      }
+    } catch (err) {
+      console.error("Erro ao buscar empresas:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchEmpresa();
+    fetchEmpresas();
+  }, [fetchEmpresa, fetchEmpresas]);
+
+  const switchEmpresa = useCallback(async (id: string) => {
+    const found = empresas.find((e) => e.id === id);
+    if (found) {
+      setEmpresa(found);
+      // Atualizar empresa_id no profile do usuário
+      if (profile) {
+        await supabase
+          .from("profiles")
+          .update({ empresa_id: id })
+          .eq("id", profile.id);
+      }
+    }
+  }, [empresas, profile]);
 
   const isTenantActive = useCallback(() => {
     return empresa?.status === "ativa";
@@ -129,8 +165,26 @@ export function EmpresaProvider({ children, initialEmpresaId }: { children: Reac
     return true;
   }, [empresa]);
 
+  const refetch = useCallback(() => {
+    fetchEmpresa();
+    fetchEmpresas();
+  }, [fetchEmpresa, fetchEmpresas]);
+
   return (
-    <EmpresaContext.Provider value={{ empresa, setEmpresa, empresas: mockEmpresas, switchEmpresa, isTenantActive, checkLimit }}>
+    <EmpresaContext.Provider
+      value={{
+        empresa,
+        empresaId: empresa?.id || null,
+        loading,
+        error,
+        setEmpresa,
+        empresas,
+        switchEmpresa,
+        isTenantActive,
+        checkLimit,
+        refetch,
+      }}
+    >
       {children}
     </EmpresaContext.Provider>
   );
@@ -142,4 +196,8 @@ export function useEmpresa() {
   return ctx;
 }
 
-export { mockEmpresas, planLimits };
+// Hook helper: retorna empresa_id para queries
+export function useEmpresaId(): string | null {
+  const { empresaId } = useEmpresa();
+  return empresaId;
+}

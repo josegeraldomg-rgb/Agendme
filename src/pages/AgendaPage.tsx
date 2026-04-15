@@ -7,130 +7,92 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Clock,
-  User,
   CalendarDays,
-  Settings2,
   UserPlus,
   ListChecks,
-  BarChart3,
-  AlertTriangle,
+  Bell,
   Check,
   X,
-  Bell,
+  Loader2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { format, addDays, subDays, startOfWeek, isSameDay, addMinutes, getDay } from "date-fns";
+import { format, addDays, subDays, startOfWeek, isSameDay, addMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
   type SlotAgenda,
   type HorarioFuncionamento,
-  type Ausencia,
-  type BloqueioAgenda,
-  type Feriado,
   type WaitlistEntry,
   gerarSlots,
   gerarSlotsSemana,
   aplicarBloqueios,
   criarEncaixe,
   verificarListaEspera,
-  verificarConflito,
   calcularMetricas,
 } from "@/lib/scheduling-engine";
+import {
+  useAgendamentosByRange,
+  useCreateAgendamento,
+  useUpdateAgendamento,
+  useCancelAgendamento,
+  useProfissionais,
+  useHorariosFuncionamento,
+} from "@/hooks/use-agendamentos";
+import { useServicos } from "@/hooks/use-servicos";
+import { useClientes } from "@/hooks/use-clientes";
 
 /* ══════════════════════════════════════════════════════════════
-   Mock Data
+   Helpers
    ══════════════════════════════════════════════════════════════ */
 
-const profissionais = [
-  { id: "joao", nome: "Dr. João", foto: "" },
-  { id: "paula", nome: "Dra. Paula", foto: "" },
-  { id: "ricardo", nome: "Dr. Ricardo", foto: "" },
-];
+function dbToHorario(h: {
+  id: string;
+  profissional_id: string;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fim: string;
+  intervalo_minutos: number | null;
+}): HorarioFuncionamento {
+  return {
+    id: h.id,
+    profissionalId: h.profissional_id,
+    diaSemana: h.dia_semana,
+    horaInicio: h.hora_inicio,
+    horaFim: h.hora_fim,
+    intervaloMinutos: h.intervalo_minutos ?? 30,
+  };
+}
 
-const defaultHorarios: HorarioFuncionamento[] = profissionais.flatMap((p) =>
-  [1, 2, 3, 4, 5].map((dia) => ({
-    id: `${p.id}-${dia}`,
-    profissionalId: p.id,
-    diaSemana: dia,
-    horaInicio: "08:00",
-    horaFim: "18:00",
-    intervaloMinutos: 30,
-  }))
-);
-
-const mockAusencias: Ausencia[] = [
-  {
-    id: "a1",
-    profissionalId: "joao",
-    dataInicio: new Date(2026, 2, 25),
-    dataFim: new Date(2026, 2, 25),
-    diaTodo: false,
-    horaInicio: "14:00",
-    horaFim: "17:00",
-    motivo: "Consulta médica",
-  },
-];
-
-const mockFeriados: Feriado[] = [
-  { data: new Date(2026, 3, 3), nome: "Sexta-feira Santa" },
-  { data: new Date(2026, 3, 21), nome: "Tiradentes" },
-  { data: new Date(2026, 4, 1), nome: "Dia do Trabalho" },
-];
-
-const mockAgendamentos: SlotAgenda[] = [
-  {
-    id: "ag1", profissionalId: "joao",
-    dataHoraInicio: new Date(2026, 2, 21, 9, 0),
-    dataHoraFim: new Date(2026, 2, 21, 9, 30),
-    status: "ocupado", origem: "automatico",
-    paciente: "Maria Silva", servico: "Consulta",
-  },
-  {
-    id: "ag2", profissionalId: "joao",
-    dataHoraInicio: new Date(2026, 2, 21, 10, 0),
-    dataHoraFim: new Date(2026, 2, 21, 10, 30),
-    status: "ocupado", origem: "automatico",
-    paciente: "Carlos Souza", servico: "Retorno",
-  },
-  {
-    id: "ag3", profissionalId: "paula",
-    dataHoraInicio: new Date(2026, 2, 21, 11, 0),
-    dataHoraFim: new Date(2026, 2, 21, 12, 0),
-    status: "ocupado", origem: "automatico",
-    paciente: "Ana Oliveira", servico: "Avaliação Completa",
-  },
-  {
-    id: "ag4", profissionalId: "ricardo",
-    dataHoraInicio: new Date(2026, 2, 21, 15, 0),
-    dataHoraFim: new Date(2026, 2, 21, 15, 30),
-    status: "ocupado", origem: "automatico",
-    paciente: "Pedro Santos", servico: "Fisioterapia",
-  },
-];
-
-const mockListaEspera: WaitlistEntry[] = [
-  {
-    id: "w1", paciente: "Fernanda Lima", servico: "Consulta",
-    profissionalId: "joao", dataPreferida: new Date(2026, 2, 21),
-    status: "aguardando",
-  },
-  {
-    id: "w2", paciente: "Lucas Pereira", servico: "Avaliação",
-    profissionalId: "paula", dataPreferida: new Date(2026, 2, 22),
-    status: "aguardando",
-  },
-];
+function dbToSlot(ag: {
+  id: string;
+  profissional_id: string;
+  data: string;
+  hora_inicio: string;
+  hora_fim: string;
+  clientes?: { nome: string } | null;
+  servicos?: { nome: string } | null;
+  observacoes?: string | null;
+}): SlotAgenda {
+  return {
+    id: ag.id,
+    profissionalId: ag.profissional_id,
+    dataHoraInicio: new Date(`${ag.data}T${ag.hora_inicio}`),
+    dataHoraFim: new Date(`${ag.data}T${ag.hora_fim}`),
+    status: "ocupado",
+    origem: "automatico",
+    paciente: ag.clientes?.nome ?? "—",
+    servico: ag.servicos?.nome ?? "—",
+    observacao: ag.observacoes ?? undefined,
+  };
+}
 
 /* ══════════════════════════════════════════════════════════════
-   Slot status colors
+   Constants
    ══════════════════════════════════════════════════════════════ */
 
 const slotColors: Record<string, string> = {
@@ -147,6 +109,12 @@ const slotDot: Record<string, string> = {
   encaixe: "bg-warning",
 };
 
+const TIME_LABELS: string[] = [];
+for (let h = 7; h <= 19; h++) {
+  TIME_LABELS.push(`${String(h).padStart(2, "0")}:00`);
+  TIME_LABELS.push(`${String(h).padStart(2, "0")}:30`);
+}
+
 type View = "dia" | "semana";
 
 /* ══════════════════════════════════════════════════════════════
@@ -156,30 +124,30 @@ type View = "dia" | "semana";
 const AgendaPage = () => {
   const { toast } = useToast();
   const [view, setView] = useState<View>("dia");
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 21));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [filtroProfissional, setFiltroProfissional] = useState("todos");
-  const [agendamentos, setAgendamentos] = useState<SlotAgenda[]>(mockAgendamentos);
-  const [bloqueios, setBloqueios] = useState<BloqueioAgenda[]>([]);
-  const [listaEspera, setListaEspera] = useState<WaitlistEntry[]>(mockListaEspera);
+  const [listaEspera, setListaEspera] = useState<WaitlistEntry[]>([]);
 
   // Dialogs
   const [dialogAgendamento, setDialogAgendamento] = useState(false);
   const [dialogEncaixe, setDialogEncaixe] = useState(false);
   const [dialogListaEspera, setDialogListaEspera] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SlotAgenda | null>(null);
 
   // New appointment form
-  const [novoPaciente, setNovoPaciente] = useState("");
-  const [novoServico, setNovoServico] = useState("");
+  const [novoPacienteId, setNovoPacienteId] = useState("");
+  const [novoServicoId, setNovoServicoId] = useState("");
+  const [novoProfissionalId, setNovoProfissionalId] = useState("");
+  const [novaData, setNovaData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [novaHoraInicio, setNovaHoraInicio] = useState("08:00");
   const [novaObservacao, setNovaObservacao] = useState("");
 
   // Encaixe form
   const [encaixeProfissional, setEncaixeProfissional] = useState("");
   const [encaixeHora, setEncaixeHora] = useState("08:00");
   const [encaixeDuracao, setEncaixeDuracao] = useState("30");
-  const [encaixePaciente, setEncaixePaciente] = useState("");
-  const [encaixeServico, setEncaixeServico] = useState("");
+  const [encaixePacienteId, setEncaixePacienteId] = useState("");
+  const [encaixeServicoId, setEncaixeServicoId] = useState("");
 
   // Waitlist form
   const [wlPaciente, setWlPaciente] = useState("");
@@ -187,14 +155,63 @@ const AgendaPage = () => {
   const [wlProfissional, setWlProfissional] = useState("");
   const [wlData, setWlData] = useState<Date | undefined>();
 
+  /* ── Date range for DB queries ── */
+  const rangeStart = useMemo(
+    () =>
+      format(
+        view === "semana"
+          ? startOfWeek(currentDate, { weekStartsOn: 1 })
+          : currentDate,
+        "yyyy-MM-dd"
+      ),
+    [currentDate, view]
+  );
+  const rangeEnd = useMemo(
+    () =>
+      format(
+        view === "semana"
+          ? addDays(startOfWeek(currentDate, { weekStartsOn: 1 }), 6)
+          : currentDate,
+        "yyyy-MM-dd"
+      ),
+    [currentDate, view]
+  );
+
+  /* ── Real data hooks ── */
+  const { data: dbAgendamentos = [], isLoading: loadingAg } = useAgendamentosByRange(rangeStart, rangeEnd);
+  const { data: dbProfissionais = [] } = useProfissionais();
+  const { data: dbHorarios = [] } = useHorariosFuncionamento();
+  const { data: dbServicos = [] } = useServicos({ ativo: true });
+  const { data: dbClientes = [] } = useClientes({ ativo: true });
+
+  /* ── Mutations ── */
+  const createAgendamento = useCreateAgendamento();
+  const cancelAgendamento = useCancelAgendamento();
+  const updateAgendamento = useUpdateAgendamento();
+
+  /* ── Transform DB data for scheduling engine ── */
+  const horarios = useMemo(() => dbHorarios.map(dbToHorario), [dbHorarios]);
+  const agendamentosSlots = useMemo(() => dbAgendamentos.map(dbToSlot), [dbAgendamentos]);
+
+  /* ── Derived service duration for hora_fim ── */
+  const selectedServicoDuracao = useMemo(() => {
+    if (!novoServicoId) return 30;
+    return dbServicos.find((s) => s.id === novoServicoId)?.duracao_minutos ?? 30;
+  }, [novoServicoId, dbServicos]);
+
+  const encaixeServicoDuracao = useMemo(() => {
+    if (!encaixeServicoId) return parseInt(encaixeDuracao);
+    return dbServicos.find((s) => s.id === encaixeServicoId)?.duracao_minutos ?? parseInt(encaixeDuracao);
+  }, [encaixeServicoId, encaixeDuracao, dbServicos]);
+
   /* ── Slot generation ── */
   const slotsProcessados = useMemo(() => {
-    const base = view === "dia"
-      ? gerarSlots(defaultHorarios, currentDate)
-      : gerarSlotsSemana(defaultHorarios, startOfWeek(currentDate, { weekStartsOn: 1 }));
-
-    return aplicarBloqueios(base, agendamentos, mockAusencias, bloqueios, mockFeriados);
-  }, [currentDate, view, agendamentos, bloqueios]);
+    const base =
+      view === "dia"
+        ? gerarSlots(horarios, currentDate)
+        : gerarSlotsSemana(horarios, startOfWeek(currentDate, { weekStartsOn: 1 }));
+    return aplicarBloqueios(base, agendamentosSlots, [], [], []);
+  }, [currentDate, view, agendamentosSlots, horarios]);
 
   const slotsFiltrados = useMemo(() => {
     if (filtroProfissional === "todos") return slotsProcessados;
@@ -204,13 +221,29 @@ const AgendaPage = () => {
   const metricas = useMemo(() => calcularMetricas(slotsFiltrados), [slotsFiltrados]);
 
   /* ── Navigation ── */
-  const navPrev = () => setCurrentDate((d) => view === "dia" ? subDays(d, 1) : subDays(d, 7));
-  const navNext = () => setCurrentDate((d) => view === "dia" ? addDays(d, 1) : addDays(d, 7));
+  const navPrev = () =>
+    setCurrentDate((d) => (view === "dia" ? subDays(d, 1) : subDays(d, 7)));
+  const navNext = () =>
+    setCurrentDate((d) => (view === "dia" ? addDays(d, 1) : addDays(d, 7)));
+
+  /* ── Form reset ── */
+  const resetAgendamentoForm = () => {
+    setNovoPacienteId("");
+    setNovoServicoId("");
+    setNovoProfissionalId("");
+    setNovaData(format(new Date(), "yyyy-MM-dd"));
+    setNovaHoraInicio("08:00");
+    setNovaObservacao("");
+    setSelectedSlot(null);
+  };
 
   /* ── Handlers ── */
   const handleSlotClick = (slot: SlotAgenda) => {
     if (slot.status === "livre") {
       setSelectedSlot(slot);
+      setNovoProfissionalId(slot.profissionalId);
+      setNovaData(format(slot.dataHoraInicio, "yyyy-MM-dd"));
+      setNovaHoraInicio(format(slot.dataHoraInicio, "HH:mm"));
       setDialogAgendamento(true);
     } else if (slot.status === "ocupado") {
       setSelectedSlot(slot);
@@ -218,81 +251,103 @@ const AgendaPage = () => {
   };
 
   const handleAgendar = () => {
-    if (!selectedSlot || !novoPaciente || !novoServico) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+    if (!novoPacienteId || !novoServicoId || !novoProfissionalId || !novaData || !novaHoraInicio) {
+      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
       return;
     }
-    const { conflito, motivo } = verificarConflito(
-      selectedSlot, agendamentos, mockAusencias, bloqueios, mockFeriados
-    );
-    if (conflito) {
-      toast({ title: "Conflito detectado", description: motivo, variant: "destructive" });
-      return;
-    }
+    const dtFim = addMinutes(new Date(`${novaData}T${novaHoraInicio}`), selectedServicoDuracao);
+    const horaFim = format(dtFim, "HH:mm");
 
-    const novo: SlotAgenda = {
-      ...selectedSlot,
-      status: "ocupado",
-      paciente: novoPaciente,
-      servico: novoServico,
-      observacao: novaObservacao || undefined,
-    };
-    setAgendamentos((prev) => [...prev, novo]);
-    toast({ title: "Agendamento criado com sucesso" });
-    setNovoPaciente("");
-    setNovoServico("");
-    setNovaObservacao("");
-    setSelectedSlot(null);
-    setDialogAgendamento(false);
+    createAgendamento.mutate(
+      {
+        paciente_id: novoPacienteId,
+        servico_id: novoServicoId,
+        profissional_id: novoProfissionalId,
+        data: novaData,
+        hora_inicio: novaHoraInicio,
+        hora_fim: horaFim,
+        observacoes: novaObservacao || null,
+        status: "agendado",
+        origem: "painel",
+      },
+      {
+        onSuccess: () => {
+          resetAgendamentoForm();
+          setDialogAgendamento(false);
+        },
+      }
+    );
   };
 
   const handleCancelar = (slot: SlotAgenda) => {
-    setAgendamentos((prev) => prev.filter((a) => a.id !== slot.id));
-    // RC7 — check waitlist
-    const esperando = verificarListaEspera(slot, listaEspera);
-    if (esperando) {
-      toast({
-        title: "Paciente na lista de espera notificado",
-        description: `${esperando.paciente} foi notificado sobre a vaga disponível.`,
-      });
-      setListaEspera((prev) =>
-        prev.map((e) => (e.id === esperando.id ? { ...e, status: "notificado" as const } : e))
-      );
-    } else {
-      toast({ title: "Agendamento cancelado — horário liberado" });
-    }
-    setSelectedSlot(null);
+    cancelAgendamento.mutate(
+      { id: slot.id, tipo: "cancelado_clinica" },
+      {
+        onSuccess: () => {
+          const esperando = verificarListaEspera(slot, listaEspera);
+          if (esperando) {
+            toast({
+              title: "Paciente na lista de espera notificado",
+              description: `${esperando.paciente} foi notificado sobre a vaga disponível.`,
+            });
+            setListaEspera((prev) =>
+              prev.map((e) =>
+                e.id === esperando.id ? { ...e, status: "notificado" as const } : e
+              )
+            );
+          }
+          setSelectedSlot(null);
+        },
+      }
+    );
+  };
+
+  const handleConfirmar = (slot: SlotAgenda) => {
+    updateAgendamento.mutate(
+      { id: slot.id, status: "confirmado" as any, confirmado_em: new Date().toISOString() },
+      { onSuccess: () => setSelectedSlot(null) }
+    );
+  };
+
+  const handleAtendido = (slot: SlotAgenda) => {
+    updateAgendamento.mutate(
+      { id: slot.id, status: "atendido" as any, atendido_em: new Date().toISOString() },
+      { onSuccess: () => setSelectedSlot(null) }
+    );
   };
 
   const handleEncaixe = () => {
-    if (!encaixeProfissional || !encaixePaciente || !encaixeServico) {
+    if (!encaixeProfissional || !encaixePacienteId || !encaixeServicoId) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
-    const [h, m] = encaixeHora.split(":").map(Number);
-    const dataInicio = new Date(currentDate);
-    dataInicio.setHours(h, m, 0, 0);
-
-    const novoEncaixe = criarEncaixe(
-      encaixeProfissional, dataInicio, parseInt(encaixeDuracao), encaixePaciente, encaixeServico
+    const dtFim = addMinutes(
+      new Date(`${format(currentDate, "yyyy-MM-dd")}T${encaixeHora}`),
+      encaixeServicoDuracao
     );
 
-    const { conflito, motivo } = verificarConflito(
-      novoEncaixe, agendamentos, mockAusencias, bloqueios, mockFeriados
+    createAgendamento.mutate(
+      {
+        paciente_id: encaixePacienteId,
+        servico_id: encaixeServicoId,
+        profissional_id: encaixeProfissional,
+        data: format(currentDate, "yyyy-MM-dd"),
+        hora_inicio: encaixeHora,
+        hora_fim: format(dtFim, "HH:mm"),
+        status: "agendado",
+        origem: "encaixe",
+      },
+      {
+        onSuccess: () => {
+          setEncaixeProfissional("");
+          setEncaixeHora("08:00");
+          setEncaixeDuracao("30");
+          setEncaixePacienteId("");
+          setEncaixeServicoId("");
+          setDialogEncaixe(false);
+        },
+      }
     );
-    if (conflito) {
-      toast({ title: "Conflito no encaixe", description: motivo, variant: "destructive" });
-      return;
-    }
-
-    setAgendamentos((prev) => [...prev, novoEncaixe]);
-    toast({ title: "Encaixe criado com sucesso" });
-    setEncaixeProfissional("");
-    setEncaixeHora("08:00");
-    setEncaixeDuracao("30");
-    setEncaixePaciente("");
-    setEncaixeServico("");
-    setDialogEncaixe(false);
   };
 
   const handleAddWaitlist = () => {
@@ -317,19 +372,10 @@ const AgendaPage = () => {
     setDialogListaEspera(false);
   };
 
-  const getNomeProfissional = (id: string) => profissionais.find((p) => p.id === id)?.nome || id;
+  const getNomeProfissional = (id: string) =>
+    dbProfissionais.find((p) => p.id === id)?.nome || id;
 
-  /* ── Time labels for day view ── */
-  const timeLabels = useMemo(() => {
-    const labels: string[] = [];
-    for (let h = 8; h <= 17; h++) {
-      labels.push(`${String(h).padStart(2, "0")}:00`);
-      labels.push(`${String(h).padStart(2, "0")}:30`);
-    }
-    return labels;
-  }, []);
-
-  /* ── Group slots by time for day view ── */
+  /* ── Group slots ── */
   const slotsByTime = useMemo(() => {
     const map = new Map<string, SlotAgenda[]>();
     for (const s of slotsFiltrados) {
@@ -341,41 +387,60 @@ const AgendaPage = () => {
     return map;
   }, [slotsFiltrados, currentDate, view]);
 
-  /* ── Week days ── */
   const weekDays = useMemo(() => {
     const start = startOfWeek(currentDate, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [currentDate]);
 
-  /* ── Slots by day+time for week view ── */
   const slotsByDayTime = useMemo(() => {
     const map = new Map<string, SlotAgenda[]>();
     for (const s of slotsFiltrados) {
-      const dayKey = format(s.dataHoraInicio, "yyyy-MM-dd");
-      const timeKey = format(s.dataHoraInicio, "HH:mm");
-      const key = `${dayKey}-${timeKey}`;
+      const key = `${format(s.dataHoraInicio, "yyyy-MM-dd")}-${format(s.dataHoraInicio, "HH:mm")}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
     return map;
   }, [slotsFiltrados]);
 
+  const isMutating =
+    createAgendamento.isPending || cancelAgendamento.isPending || updateAgendamento.isPending;
+
+  /* ════════════════════════════════════════ RENDER ════════════════════════════════════════ */
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agenda Inteligente</h1>
-          <p className="text-muted-foreground text-sm">Motor de agenda com controle de conflitos em tempo real</p>
+          <p className="text-muted-foreground text-sm">
+            Motor de agenda com controle de conflitos em tempo real
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button className="gap-2" onClick={() => { setSelectedSlot(null); setDialogAgendamento(true); }}>
+          <Button
+            id="btn-novo-agendamento"
+            className="gap-2"
+            onClick={() => {
+              resetAgendamentoForm();
+              setDialogAgendamento(true);
+            }}
+          >
             <Plus className="h-4 w-4" /> Novo Agendamento
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setDialogEncaixe(true)}>
+          <Button
+            id="btn-encaixe"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setDialogEncaixe(true)}
+          >
             <UserPlus className="h-4 w-4" /> Encaixe
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setDialogListaEspera(true)}>
+          <Button
+            id="btn-lista-espera"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setDialogListaEspera(true)}
+          >
             <ListChecks className="h-4 w-4" /> Lista de Espera
           </Button>
         </div>
@@ -404,7 +469,7 @@ const AgendaPage = () => {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={navPrev}>
+              <Button variant="outline" size="icon" onClick={navPrev} id="btn-prev">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-semibold text-foreground min-w-[200px] text-center">
@@ -412,12 +477,19 @@ const AgendaPage = () => {
                   ? format(currentDate, "dd 'de' MMMM, yyyy", { locale: ptBR })
                   : `${format(weekDays[0], "dd/MM")} — ${format(weekDays[6], "dd/MM/yyyy")}`}
               </span>
-              <Button variant="outline" size="icon" onClick={navNext}>
+              <Button variant="outline" size="icon" onClick={navNext} id="btn-next">
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="text-xs" onClick={() => setCurrentDate(new Date(2026, 2, 21))}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => setCurrentDate(new Date())}
+                id="btn-hoje"
+              >
                 Hoje
               </Button>
+              {loadingAg && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex rounded-lg border border-border overflow-hidden">
@@ -426,7 +498,9 @@ const AgendaPage = () => {
                     key={v}
                     onClick={() => setView(v)}
                     className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                      view === v
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -434,18 +508,21 @@ const AgendaPage = () => {
                 ))}
               </div>
               <Select value={filtroProfissional} onValueChange={setFiltroProfissional}>
-                <SelectTrigger className="w-[160px] h-8 text-xs">
+                <SelectTrigger className="w-[160px] h-8 text-xs" id="select-profissional-filtro">
                   <SelectValue placeholder="Profissional" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  {profissionais.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  {dbProfissionais.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
           {/* Legend */}
           <div className="flex items-center gap-4 mt-2 flex-wrap">
             {[
@@ -461,11 +538,26 @@ const AgendaPage = () => {
             ))}
           </div>
         </CardHeader>
+
         <CardContent>
+          {/* ═══ Empty state when no schedules ═══ */}
+          {!loadingAg && horarios.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+              <CalendarDays className="h-12 w-12 text-muted-foreground/40" />
+              <p className="text-muted-foreground font-medium">Nenhum horário configurado</p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Configure os horários de funcionamento dos profissionais para visualizar a agenda.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => (window.location.href = "/horarios")}>
+                Configurar Horários
+              </Button>
+            </div>
+          )}
+
           {/* ═══ Day View ═══ */}
-          {view === "dia" && (
+          {view === "dia" && horarios.length > 0 && (
             <div className="space-y-0.5">
-              {timeLabels.map((time) => {
+              {TIME_LABELS.map((time) => {
                 const slotsAtTime = slotsByTime.get(time) || [];
                 return (
                   <div key={time} className="flex gap-3 min-h-[44px]">
@@ -484,27 +576,47 @@ const AgendaPage = () => {
                                 }`}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <div className={`h-2 w-2 rounded-full shrink-0 ${slotDot[slot.status]}`} />
+                                  <div
+                                    className={`h-2 w-2 rounded-full shrink-0 ${slotDot[slot.status]}`}
+                                  />
                                   {slot.status === "ocupado" ? (
                                     <div className="min-w-0">
-                                      <p className="font-medium text-foreground truncate">{slot.paciente}</p>
-                                      <p className="text-muted-foreground truncate">{slot.servico} • {getNomeProfissional(slot.profissionalId)}</p>
+                                      <p className="font-medium text-foreground truncate">
+                                        {slot.paciente}
+                                      </p>
+                                      <p className="text-muted-foreground truncate">
+                                        {slot.servico} • {getNomeProfissional(slot.profissionalId)}
+                                      </p>
                                     </div>
                                   ) : slot.status === "bloqueado" ? (
                                     <span className="text-muted-foreground">Bloqueado</span>
                                   ) : (
-                                    <span className="text-success">{getNomeProfissional(slot.profissionalId)}</span>
+                                    <span className="text-success">
+                                      {getNomeProfissional(slot.profissionalId)}
+                                    </span>
                                   )}
                                   {slot.origem === "encaixe" && (
-                                    <Badge variant="outline" className="text-[10px] ml-auto border-warning text-warning">Encaixe</Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] ml-auto border-warning text-warning"
+                                    >
+                                      Encaixe
+                                    </Badge>
                                   )}
                                 </div>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>{getNomeProfissional(slot.profissionalId)}</p>
-                              <p className="text-xs">{format(slot.dataHoraInicio, "HH:mm")} — {format(slot.dataHoraFim, "HH:mm")}</p>
-                              {slot.paciente && <p className="text-xs">{slot.paciente} • {slot.servico}</p>}
+                              <p className="text-xs">
+                                {format(slot.dataHoraInicio, "HH:mm")} —{" "}
+                                {format(slot.dataHoraFim, "HH:mm")}
+                              </p>
+                              {slot.paciente && (
+                                <p className="text-xs">
+                                  {slot.paciente} • {slot.servico}
+                                </p>
+                              )}
                             </TooltipContent>
                           </Tooltip>
                         ))
@@ -519,7 +631,7 @@ const AgendaPage = () => {
           )}
 
           {/* ═══ Week View ═══ */}
-          {view === "semana" && (
+          {view === "semana" && horarios.length > 0 && (
             <div className="overflow-x-auto">
               <div className="min-w-[700px]">
                 {/* Header */}
@@ -529,7 +641,7 @@ const AgendaPage = () => {
                     <div
                       key={d.toISOString()}
                       className={`text-center text-xs font-medium p-1.5 rounded-md ${
-                        isSameDay(d, new Date(2026, 2, 21)) ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                        isSameDay(d, new Date()) ? "bg-primary/10 text-primary" : "text-muted-foreground"
                       }`}
                     >
                       <div>{format(d, "EEE", { locale: ptBR })}</div>
@@ -539,9 +651,14 @@ const AgendaPage = () => {
                 </div>
                 {/* Grid */}
                 <div className="space-y-0.5">
-                  {timeLabels.filter((_, i) => i % 2 === 0).map((time) => (
-                    <div key={time} className="grid grid-cols-[60px_repeat(7,1fr)] gap-1 min-h-[36px]">
-                      <span className="text-[10px] font-mono text-muted-foreground text-right pr-2 pt-1">{time}</span>
+                  {TIME_LABELS.filter((_, i) => i % 2 === 0).map((time) => (
+                    <div
+                      key={time}
+                      className="grid grid-cols-[60px_repeat(7,1fr)] gap-1 min-h-[36px]"
+                    >
+                      <span className="text-[10px] font-mono text-muted-foreground text-right pr-2 pt-1">
+                        {time}
+                      </span>
                       {weekDays.map((day) => {
                         const dayKey = format(day, "yyyy-MM-dd");
                         const slotsHere = slotsByDayTime.get(`${dayKey}-${time}`) || [];
@@ -554,7 +671,9 @@ const AgendaPage = () => {
                         return (
                           <div
                             key={dayKey}
-                            onClick={() => mainSlot.status === "livre" && handleSlotClick(mainSlot)}
+                            onClick={() =>
+                              mainSlot.status === "livre" && handleSlotClick(mainSlot)
+                            }
                             className={`border-t border-border rounded p-1 text-[10px] transition-colors ${
                               allBlocked
                                 ? "bg-muted/50 opacity-50"
@@ -601,9 +720,16 @@ const AgendaPage = () => {
                   >
                     <div className="text-xs">
                       <span className="font-medium text-foreground">{e.paciente}</span>
-                      <span className="text-muted-foreground"> • {e.servico} • {getNomeProfissional(e.profissionalId)} • {format(e.dataPreferida, "dd/MM")}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        • {e.servico} • {getNomeProfissional(e.profissionalId)} •{" "}
+                        {format(e.dataPreferida, "dd/MM")}
+                      </span>
                     </div>
-                    <Badge variant={e.status === "notificado" ? "default" : "secondary"} className="text-[10px]">
+                    <Badge
+                      variant={e.status === "notificado" ? "default" : "secondary"}
+                      className="text-[10px]"
+                    >
                       {e.status === "notificado" ? "Notificado" : "Aguardando"}
                     </Badge>
                   </div>
@@ -614,42 +740,148 @@ const AgendaPage = () => {
       )}
 
       {/* ═══ Dialog: New Appointment ═══ */}
-      <Dialog open={dialogAgendamento} onOpenChange={(o) => { setDialogAgendamento(o); if (!o) setSelectedSlot(null); }}>
+      <Dialog
+        open={dialogAgendamento}
+        onOpenChange={(o) => {
+          setDialogAgendamento(o);
+          if (!o) resetAgendamentoForm();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Novo Agendamento</DialogTitle>
           </DialogHeader>
+
           {selectedSlot && (
             <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 flex items-center gap-2">
               <CalendarDays className="h-4 w-4" />
-              {format(selectedSlot.dataHoraInicio, "dd/MM/yyyy")} — {format(selectedSlot.dataHoraInicio, "HH:mm")} às {format(selectedSlot.dataHoraFim, "HH:mm")}
+              {format(selectedSlot.dataHoraInicio, "dd/MM/yyyy")} —{" "}
+              {format(selectedSlot.dataHoraInicio, "HH:mm")} às{" "}
+              {format(selectedSlot.dataHoraFim, "HH:mm")}
               <span className="ml-auto">{getNomeProfissional(selectedSlot.profissionalId)}</span>
             </div>
           )}
+
           <div className="space-y-3">
+            {/* Profissional (shown when no slot) */}
+            {!selectedSlot && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Profissional *</Label>
+                    <Select value={novoProfissionalId} onValueChange={setNovoProfissionalId}>
+                      <SelectTrigger id="select-prof-new">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dbProfissionais.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data *</Label>
+                    <Input
+                      id="input-data-new"
+                      type="date"
+                      value={novaData}
+                      onChange={(e) => setNovaData(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Horário de início *</Label>
+                  <Select value={novaHoraInicio} onValueChange={setNovaHoraInicio}>
+                    <SelectTrigger id="select-hora-new">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_LABELS.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {/* Paciente */}
             <div className="space-y-1.5">
               <Label className="text-xs">Paciente *</Label>
-              <Input placeholder="Nome do paciente" value={novoPaciente} onChange={(e) => setNovoPaciente(e.target.value)} />
+              <Select value={novoPacienteId} onValueChange={setNovoPacienteId}>
+                <SelectTrigger id="select-paciente-new">
+                  <SelectValue placeholder="Selecione o paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dbClientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {dbClientes.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum paciente cadastrado.{" "}
+                  <a href="/pacientes" className="text-primary underline">
+                    Cadastrar
+                  </a>
+                </p>
+              )}
             </div>
+
+            {/* Serviço */}
             <div className="space-y-1.5">
               <Label className="text-xs">Serviço *</Label>
-              <Select value={novoServico} onValueChange={setNovoServico}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Select value={novoServicoId} onValueChange={setNovoServicoId}>
+                <SelectTrigger id="select-servico-new">
+                  <SelectValue placeholder="Selecione o serviço" />
+                </SelectTrigger>
                 <SelectContent>
-                  {["Consulta", "Retorno", "Avaliação Completa", "Fisioterapia"].map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {dbServicos.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.nome} ({s.duracao_minutos} min)
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Observação */}
             <div className="space-y-1.5">
               <Label className="text-xs">Observação</Label>
-              <Textarea placeholder="Observações..." value={novaObservacao} onChange={(e) => setNovaObservacao(e.target.value)} rows={2} />
+              <Textarea
+                id="textarea-obs-new"
+                placeholder="Observações..."
+                value={novaObservacao}
+                onChange={(e) => setNovaObservacao(e.target.value)}
+                rows={2}
+              />
             </div>
           </div>
+
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleAgendar}>Confirmar</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button
+              id="btn-confirmar-agendamento"
+              onClick={handleAgendar}
+              disabled={createAgendamento.isPending}
+            >
+              {createAgendamento.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...
+                </>
+              ) : (
+                "Confirmar"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -666,9 +898,15 @@ const AgendaPage = () => {
             <div className="space-y-1.5">
               <Label className="text-xs">Profissional *</Label>
               <Select value={encaixeProfissional} onValueChange={setEncaixeProfissional}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="select-prof-encaixe">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
-                  {profissionais.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                  {dbProfissionais.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -676,34 +914,81 @@ const AgendaPage = () => {
               <div className="space-y-1.5">
                 <Label className="text-xs">Horário *</Label>
                 <Select value={encaixeHora} onValueChange={setEncaixeHora}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="select-hora-encaixe">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {timeLabels.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {TIME_LABELS.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Duração (min)</Label>
                 <Select value={encaixeDuracao} onValueChange={setEncaixeDuracao}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="select-duracao-encaixe">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {["15", "20", "30", "45", "60"].map((d) => <SelectItem key={d} value={d}>{d} min</SelectItem>)}
+                    {["15", "20", "30", "45", "60"].map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d} min
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Paciente *</Label>
-              <Input placeholder="Nome" value={encaixePaciente} onChange={(e) => setEncaixePaciente(e.target.value)} />
+              <Select value={encaixePacienteId} onValueChange={setEncaixePacienteId}>
+                <SelectTrigger id="select-paciente-encaixe">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dbClientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Serviço *</Label>
-              <Input placeholder="Serviço" value={encaixeServico} onChange={(e) => setEncaixeServico(e.target.value)} />
+              <Select value={encaixeServicoId} onValueChange={setEncaixeServicoId}>
+                <SelectTrigger id="select-servico-encaixe">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dbServicos.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleEncaixe} className="bg-warning text-warning-foreground hover:bg-warning/90">Criar Encaixe</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button
+              id="btn-criar-encaixe"
+              onClick={handleEncaixe}
+              disabled={createAgendamento.isPending}
+              className="bg-warning text-warning-foreground hover:bg-warning/90"
+            >
+              {createAgendamento.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Criar Encaixe"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -719,31 +1004,56 @@ const AgendaPage = () => {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Paciente *</Label>
-              <Input placeholder="Nome" value={wlPaciente} onChange={(e) => setWlPaciente(e.target.value)} />
+              <Input
+                id="input-wl-paciente"
+                placeholder="Nome"
+                value={wlPaciente}
+                onChange={(e) => setWlPaciente(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Serviço *</Label>
-              <Input placeholder="Serviço desejado" value={wlServico} onChange={(e) => setWlServico(e.target.value)} />
+              <Input
+                id="input-wl-servico"
+                placeholder="Serviço desejado"
+                value={wlServico}
+                onChange={(e) => setWlServico(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Profissional *</Label>
               <Select value={wlProfissional} onValueChange={setWlProfissional}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger id="select-wl-prof">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
-                  {profissionais.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                  {dbProfissionais.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Data Preferida *</Label>
               <div className="border border-input rounded-md">
-                <Calendar mode="single" selected={wlData} onSelect={setWlData} locale={ptBR} />
+                <Calendar
+                  mode="single"
+                  selected={wlData}
+                  onSelect={setWlData}
+                  locale={ptBR}
+                />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleAddWaitlist}>Adicionar</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button id="btn-adicionar-wl" onClick={handleAddWaitlist}>
+              Adicionar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -766,23 +1076,75 @@ const AgendaPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Profissional</span>
-                <span className="text-foreground">{getNomeProfissional(selectedSlot.profissionalId)}</span>
+                <span className="text-foreground">
+                  {getNomeProfissional(selectedSlot.profissionalId)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Horário</span>
                 <span className="text-foreground">
-                  {format(selectedSlot.dataHoraInicio, "HH:mm")} — {format(selectedSlot.dataHoraFim, "HH:mm")}
+                  {format(selectedSlot.dataHoraInicio, "HH:mm")} —{" "}
+                  {format(selectedSlot.dataHoraFim, "HH:mm")}
                 </span>
               </div>
+              {selectedSlot.observacao && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Obs.</span>
+                  <span className="text-foreground text-right max-w-[60%]">
+                    {selectedSlot.observacao}
+                  </span>
+                </div>
+              )}
               {selectedSlot.origem === "encaixe" && (
-                <Badge variant="outline" className="border-warning text-warning">Encaixe</Badge>
+                <Badge variant="outline" className="border-warning text-warning">
+                  Encaixe
+                </Badge>
               )}
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="destructive" size="sm" onClick={() => handleCancelar(selectedSlot)} className="gap-1.5">
-                <X className="h-3.5 w-3.5" /> Cancelar
+            <DialogFooter className="flex-wrap gap-2">
+              <Button
+                id="btn-confirmar-slot"
+                variant="outline"
+                size="sm"
+                onClick={() => handleConfirmar(selectedSlot)}
+                disabled={isMutating}
+                className="gap-1.5 border-success/50 text-success hover:bg-success/10"
+              >
+                <Check className="h-3.5 w-3.5" /> Confirmar
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setSelectedSlot(null)}>Fechar</Button>
+              <Button
+                id="btn-atendido-slot"
+                variant="outline"
+                size="sm"
+                onClick={() => handleAtendido(selectedSlot)}
+                disabled={isMutating}
+                className="gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" /> Atendido
+              </Button>
+              <Button
+                id="btn-cancelar-slot"
+                variant="destructive"
+                size="sm"
+                onClick={() => handleCancelar(selectedSlot)}
+                disabled={isMutating}
+                className="gap-1.5"
+              >
+                {cancelAgendamento.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <X className="h-3.5 w-3.5" />
+                )}{" "}
+                Cancelar
+              </Button>
+              <Button
+                id="btn-fechar-slot"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedSlot(null)}
+              >
+                Fechar
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,26 +1,68 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmpresaId } from "@/contexts/EmpresaContext";
 import { toast } from "@/hooks/use-toast";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
-export function useServicos() {
+type ServicoInsert = TablesInsert<"servicos">;
+type ServicoUpdate = TablesUpdate<"servicos">;
+
+export function useServicos(filters?: { categoria_id?: string; ativo?: boolean }) {
+  const empresaId = useEmpresaId();
+
   return useQuery({
-    queryKey: ["servicos"],
+    queryKey: ["servicos", empresaId, filters],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!empresaId) return [];
+      let query = supabase
         .from("servicos")
-        .select("*")
+        .select("*, categorias_servicos(id, nome, cor, icone)")
+        .eq("empresa_id", empresaId)
         .order("nome");
+
+      if (filters?.categoria_id) query = query.eq("categoria_id", filters.categoria_id);
+      if (filters?.ativo !== undefined) query = query.eq("ativo", filters.ativo);
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!empresaId,
+  });
+}
+
+export function useCategorias() {
+  const empresaId = useEmpresaId();
+
+  return useQuery({
+    queryKey: ["categorias_servicos", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+      const { data, error } = await supabase
+        .from("categorias_servicos")
+        .select("*")
+        .eq("empresa_id", empresaId)
+        .eq("ativo", true)
+        .order("ordem");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
   });
 }
 
 export function useCreateServico() {
   const queryClient = useQueryClient();
+  const empresaId = useEmpresaId();
+
   return useMutation({
-    mutationFn: async (servico: { nome: string; descricao?: string; duracao_minutos?: number; preco_base?: number }) => {
-      const { data, error } = await supabase.from("servicos").insert(servico).select().single();
+    mutationFn: async (servico: Omit<ServicoInsert, "empresa_id">) => {
+      if (!empresaId) throw new Error("Empresa não selecionada");
+      const { data, error } = await supabase
+        .from("servicos")
+        .insert({ ...servico, empresa_id: empresaId })
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },
@@ -36,9 +78,15 @@ export function useCreateServico() {
 
 export function useUpdateServico() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; nome?: string; descricao?: string; duracao_minutos?: number; preco_base?: number; ativo?: boolean }) => {
-      const { data, error } = await supabase.from("servicos").update(updates).eq("id", id).select().single();
+    mutationFn: async ({ id, ...updates }: ServicoUpdate & { id: string }) => {
+      const { data, error } = await supabase
+        .from("servicos")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },

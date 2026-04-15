@@ -12,8 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { mockEmpresas, planLimits, type Empresa } from "@/contexts/EmpresaContext";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Empresa } from "@/contexts/EmpresaContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const statusStyle: Record<string, string> = {
   ativa: "bg-success/10 text-success",
@@ -33,9 +35,35 @@ const tenantLogs = [
 export default function SaasEmpresaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const empresa = mockEmpresas.find(e => e.id === id) as Empresa | undefined;
-  const [status, setStatus] = useState(empresa?.status || "ativa");
+  const [empresa, setEmpresaData] = useState<Empresa | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("ativa");
 
+  useEffect(() => {
+    if (!id) return;
+    const fetchEmpresa = async () => {
+      const { data, error } = await supabase.from("empresas").select("*").eq("id", id).single();
+      if (!error && data) {
+        const emp: Empresa = {
+          id: data.id, nome: data.nome, slug: data.slug, email: data.email, telefone: data.telefone,
+          plano: data.plano, status: data.status, logo_url: data.logo_url,
+          dominio_customizado: data.dominio_customizado, subdominio: data.subdominio,
+          config: (data.config as Record<string, unknown>) || {},
+          limites: (data.limites as any) || {},
+          white_label: (data.white_label as Record<string, unknown>) || {},
+          created_at: data.created_at,
+        };
+        setEmpresaData(emp);
+        setStatus(emp.status);
+      }
+      setLoading(false);
+    };
+    fetchEmpresa();
+  }, [id]);
+
+  if (loading) {
+    return <div className="p-6 space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>;
+  }
   if (!empresa) {
     return (
       <div className="p-6 text-center text-muted-foreground">
@@ -57,7 +85,7 @@ export default function SaasEmpresaDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{empresa.nome}</h1>
-          <p className="text-sm text-muted-foreground">{empresa.subdominio}.agend.me {empresa.dominio && `• ${empresa.dominio}`}</p>
+          <p className="text-sm text-muted-foreground">{empresa.subdominio}.agend.me {empresa.dominio_customizado && `• ${empresa.dominio_customizado}`}</p>
         </div>
         <Badge className={cn("capitalize", statusStyle[status])} variant="outline">{status}</Badge>
       </div>
@@ -82,7 +110,7 @@ export default function SaasEmpresaDetailPage() {
                   { icon: Mail, label: empresa.email },
                   { icon: Phone, label: empresa.telefone },
                   { icon: Globe, label: `${empresa.subdominio}.agend.me` },
-                  { icon: CalendarDays, label: `Desde ${new Date(empresa.criadoEm).toLocaleDateString("pt-BR")}` },
+                  { icon: CalendarDays, label: `Desde ${new Date(empresa.created_at).toLocaleDateString("pt-BR")}` },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3 text-sm">
                     <item.icon className="h-4 w-4 text-primary shrink-0" />
@@ -101,9 +129,9 @@ export default function SaasEmpresaDetailPage() {
                 </div>
                 <div className="space-y-2 pt-2">
                   {[
-                    { label: "WhatsApp", enabled: empresa.limites.whatsappHabilitado },
-                    { label: "Teleconsulta", enabled: empresa.limites.teleconsultaHabilitada },
-                    { label: "IA (Prontuário)", enabled: empresa.limites.usoIaHabilitado },
+                    { label: "WhatsApp", enabled: empresa.limites.whatsapp_habilitado },
+                    { label: "Teleconsulta", enabled: empresa.limites.teleconsulta_habilitada },
+                    { label: "Agente de Bolso", enabled: empresa.limites.agente_bolso_habilitado },
                   ].map(f => (
                     <div key={f.label} className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">{f.label}</span>
@@ -133,7 +161,11 @@ export default function SaasEmpresaDetailPage() {
         {/* Métricas & Limites */}
         <TabsContent value="metricas" className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {empresa.metricas.map(m => {
+            {[
+              { nome: "Máx. Profissionais", valor: 0, limite: empresa.limites.max_profissionais },
+              { nome: "Máx. Pacientes", valor: 0, limite: empresa.limites.max_pacientes },
+              { nome: "Agendamentos/mês", valor: 0, limite: empresa.limites.max_agendamentos_mes },
+            ].map(m => {
               const pct = m.limite ? Math.round((m.valor / m.limite) * 100) : null;
               const isNearLimit = pct !== null && pct >= 80;
               return (
@@ -173,11 +205,12 @@ export default function SaasEmpresaDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow><TableCell>Máx. Usuários</TableCell><TableCell className="text-right font-medium">{empresa.limites.maxUsuarios}</TableCell></TableRow>
-                  <TableRow><TableCell>Agendamentos/mês</TableCell><TableCell className="text-right font-medium">{empresa.limites.maxAgendamentosMes.toLocaleString()}</TableCell></TableRow>
-                  <TableRow><TableCell>Armazenamento</TableCell><TableCell className="text-right font-medium">{(empresa.limites.armazenamentoMb / 1000).toFixed(1)} GB</TableCell></TableRow>
-                  <TableRow><TableCell>IA habilitada</TableCell><TableCell className="text-right"><Badge variant={empresa.limites.usoIaHabilitado ? "default" : "secondary"}>{empresa.limites.usoIaHabilitado ? "Sim" : "Não"}</Badge></TableCell></TableRow>
-                  <TableRow><TableCell>Teleconsulta</TableCell><TableCell className="text-right"><Badge variant={empresa.limites.teleconsultaHabilitada ? "default" : "secondary"}>{empresa.limites.teleconsultaHabilitada ? "Sim" : "Não"}</Badge></TableCell></TableRow>
+                  <TableRow><TableCell>Máx. Profissionais</TableCell><TableCell className="text-right font-medium">{empresa.limites.max_profissionais}</TableCell></TableRow>
+                  <TableRow><TableCell>Máx. Pacientes</TableCell><TableCell className="text-right font-medium">{empresa.limites.max_pacientes}</TableCell></TableRow>
+                  <TableRow><TableCell>Agendamentos/mês</TableCell><TableCell className="text-right font-medium">{empresa.limites.max_agendamentos_mes?.toLocaleString()}</TableCell></TableRow>
+                  <TableRow><TableCell>WhatsApp</TableCell><TableCell className="text-right"><Badge variant={empresa.limites.whatsapp_habilitado ? "default" : "secondary"}>{empresa.limites.whatsapp_habilitado ? "Sim" : "Não"}</Badge></TableCell></TableRow>
+                  <TableRow><TableCell>Teleconsulta</TableCell><TableCell className="text-right"><Badge variant={empresa.limites.teleconsulta_habilitada ? "default" : "secondary"}>{empresa.limites.teleconsulta_habilitada ? "Sim" : "Não"}</Badge></TableCell></TableRow>
+                  <TableRow><TableCell>Agente de Bolso</TableCell><TableCell className="text-right"><Badge variant={empresa.limites.agente_bolso_habilitado ? "default" : "secondary"}>{empresa.limites.agente_bolso_habilitado ? "Sim" : "Não"}</Badge></TableCell></TableRow>
                 </TableBody>
               </Table>
             </CardContent>
@@ -192,7 +225,7 @@ export default function SaasEmpresaDetailPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Fuso Horário</Label>
-                  <Select defaultValue={empresa.config.timezone}>
+                  <Select defaultValue={(empresa.config as any)?.timezone || 'America/Sao_Paulo'}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="America/Sao_Paulo">America/São Paulo (GMT-3)</SelectItem>
@@ -204,7 +237,7 @@ export default function SaasEmpresaDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Idioma</Label>
-                  <Select defaultValue={empresa.config.idioma}>
+                  <Select defaultValue={(empresa.config as any)?.idioma || 'pt-BR'}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
@@ -215,7 +248,7 @@ export default function SaasEmpresaDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Moeda</Label>
-                  <Select defaultValue={empresa.config.moeda}>
+                  <Select defaultValue={(empresa.config as any)?.moeda || 'BRL'}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="BRL">BRL (R$)</SelectItem>
@@ -226,7 +259,7 @@ export default function SaasEmpresaDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Formato de Data</Label>
-                  <Select defaultValue={empresa.config.formatoData}>
+                  <Select defaultValue={(empresa.config as any)?.formatoData || 'DD/MM/YYYY'}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
@@ -245,26 +278,26 @@ export default function SaasEmpresaDetailPage() {
                 <div className="space-y-2">
                   <Label>Subdomínio</Label>
                   <div className="flex items-center gap-1">
-                    <Input defaultValue={empresa.subdominio} className="flex-1" />
+                    <Input defaultValue={empresa.subdominio || ''} className="flex-1" />
                     <span className="text-sm text-muted-foreground">.agend.me</span>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Domínio Personalizado (opcional)</Label>
-                  <Input defaultValue={empresa.dominio} placeholder="agenda.suaclinica.com.br" />
+                  <Input defaultValue={empresa.dominio_customizado || ''} placeholder="agenda.suaclinica.com.br" />
                 </div>
                 <div className="pt-2 space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>WhatsApp Hub</Label>
-                    <Switch defaultChecked={empresa.limites.whatsappHabilitado} />
+                    <Switch defaultChecked={empresa.limites.whatsapp_habilitado} />
                   </div>
                   <div className="flex items-center justify-between">
                     <Label>Teleconsulta</Label>
-                    <Switch defaultChecked={empresa.limites.teleconsultaHabilitada} />
+                    <Switch defaultChecked={empresa.limites.teleconsulta_habilitada} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label>IA Prontuário</Label>
-                    <Switch defaultChecked={empresa.limites.usoIaHabilitado} />
+                    <Label>Agente de Bolso</Label>
+                    <Switch defaultChecked={empresa.limites.agente_bolso_habilitado} />
                   </div>
                 </div>
                 <Button className="w-full" onClick={() => toast.success("Domínio atualizado!")}>Salvar Domínio</Button>

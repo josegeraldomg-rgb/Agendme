@@ -4,10 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   redirectTo?: string;
+  requireEmpresa?: boolean;
 }
 
-export function ProtectedRoute({ children, redirectTo = "/login" }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+export function ProtectedRoute({ children, redirectTo = "/login", requireEmpresa = false }: ProtectedRouteProps) {
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -19,6 +20,11 @@ export function ProtectedRoute({ children, redirectTo = "/login" }: ProtectedRou
 
   if (!user) {
     return <Navigate to={redirectTo} replace />;
+  }
+
+  // If empresa is required and user doesn't have one yet → onboarding
+  if (requireEmpresa && !profile?.empresa_id) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;

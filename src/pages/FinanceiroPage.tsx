@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,140 +9,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  Plus, ArrowUpRight, ArrowDownRight, DollarSign, Users, Percent,
-  CalendarDays, Lock, TrendingUp, Receipt, Settings2, Wallet,
-  MoreHorizontal, Pencil, Check, AlertCircle, FileText, Download,
+  Plus, ArrowUpRight, DollarSign, Users,
+  TrendingUp, Receipt, Settings2, Wallet,
+  Pencil, Check, AlertCircle, FileText, Loader2, Trash2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 
-// ═══════════════════════════════════════════════════
-//  Types
-// ═══════════════════════════════════════════════════
+import {
+  useReceitas,
+  useCreateReceita,
+  useDeleteReceita,
+  useComissoesConfig,
+  useUpdateComissaoConfig,
+  useRepasses,
+  useCreateRepasse,
+  useFinanceiroResumo,
+  type MeioPagamento,
+  type CreateReceitaInput,
+} from "@/hooks/use-financeiro";
+import { useProfissionais } from "@/hooks/use-agendamentos";
+import { useClientes } from "@/hooks/use-clientes";
+import { useServicos } from "@/hooks/use-servicos";
 
-interface Profissional {
-  id: string;
-  nome: string;
-  avatar: string;
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-interface ComissaoServico {
-  id: string;
-  servicoId: string;
-  servicoNome: string;
-  percentualEmpresa: number;
-  percentualProfissional: number;
-}
-
-interface ComissaoPagamento {
-  id: string;
-  meioPagamento: "dinheiro" | "pix" | "cartao" | "mercado_pago";
-  percentualEmpresa: number;
-  percentualProfissional: number;
-}
-
-interface ReceitaServico {
-  id: string;
-  paciente: string;
-  profissionalId: string;
-  servicoNome: string;
-  valorTotal: number;
-  meioPagamento: "dinheiro" | "pix" | "cartao" | "mercado_pago";
-  dataAtendimento: string;
-  comissaoEmpresa: number;
-  comissaoProfissional: number;
-}
-
-interface RepasseProfissional {
-  id: string;
-  profissionalId: string;
-  valorPago: number;
-  dataPagamento: string;
-  periodoInicio: string;
-  periodoFim: string;
-  observacao: string;
-}
-
-interface AjusteFinanceiro {
-  id: string;
-  profissionalId: string;
-  valor: number;
-  tipo: "adicao" | "desconto";
-  motivo: string;
-  criadoEm: string;
-}
-
-interface FechamentoPeriodo {
-  id: string;
-  dataInicio: string;
-  dataFim: string;
-  status: "aberto" | "fechado";
-  criadoEm: string;
-  receitaTotal: number;
-  comissaoTotal: number;
-}
-
-// ═══════════════════════════════════════════════════
-//  Mock Data
-// ═══════════════════════════════════════════════════
-
-const profissionais: Profissional[] = [
-  { id: "p1", nome: "Dra. Ana Silva", avatar: "AS" },
-  { id: "p2", nome: "Dr. Carlos Mendes", avatar: "CM" },
-  { id: "p3", nome: "Dra. Mariana Costa", avatar: "MC" },
-];
-
-const initialComissoesServico: ComissaoServico[] = [
-  { id: "cs1", servicoId: "s1", servicoNome: "Limpeza de Pele", percentualEmpresa: 40, percentualProfissional: 60 },
-  { id: "cs2", servicoId: "s2", servicoNome: "Peeling Químico", percentualEmpresa: 45, percentualProfissional: 55 },
-  { id: "cs3", servicoId: "s3", servicoNome: "Microagulhamento", percentualEmpresa: 50, percentualProfissional: 50 },
-  { id: "cs4", servicoId: "s4", servicoNome: "Botox", percentualEmpresa: 35, percentualProfissional: 65 },
-  { id: "cs5", servicoId: "s5", servicoNome: "Drenagem Linfática", percentualEmpresa: 40, percentualProfissional: 60 },
-  { id: "cs6", servicoId: "s6", servicoNome: "Criolipólise", percentualEmpresa: 50, percentualProfissional: 50 },
-  { id: "cs7", servicoId: "s7", servicoNome: "Depilação a Laser", percentualEmpresa: 45, percentualProfissional: 55 },
-];
-
-const initialComissoesPagamento: ComissaoPagamento[] = [
-  { id: "cp1", meioPagamento: "dinheiro", percentualEmpresa: 40, percentualProfissional: 60 },
-  { id: "cp2", meioPagamento: "pix", percentualEmpresa: 40, percentualProfissional: 60 },
-  { id: "cp3", meioPagamento: "cartao", percentualEmpresa: 45, percentualProfissional: 55 },
-  { id: "cp4", meioPagamento: "mercado_pago", percentualEmpresa: 42, percentualProfissional: 58 },
-];
-
-const initialReceitas: ReceitaServico[] = [
-  { id: "r1", paciente: "Maria Silva", profissionalId: "p1", servicoNome: "Limpeza de Pele", valorTotal: 150, meioPagamento: "pix", dataAtendimento: "21/03/2026", comissaoEmpresa: 60, comissaoProfissional: 90 },
-  { id: "r2", paciente: "Carlos Souza", profissionalId: "p2", servicoNome: "Peeling Químico", valorTotal: 280, meioPagamento: "cartao", dataAtendimento: "21/03/2026", comissaoEmpresa: 126, comissaoProfissional: 154 },
-  { id: "r3", paciente: "Ana Oliveira", profissionalId: "p1", servicoNome: "Botox", valorTotal: 800, meioPagamento: "cartao", dataAtendimento: "20/03/2026", comissaoEmpresa: 280, comissaoProfissional: 520 },
-  { id: "r4", paciente: "Pedro Santos", profissionalId: "p3", servicoNome: "Drenagem Linfática", valorTotal: 120, meioPagamento: "dinheiro", dataAtendimento: "20/03/2026", comissaoEmpresa: 48, comissaoProfissional: 72 },
-  { id: "r5", paciente: "Lucia Mendes", profissionalId: "p2", servicoNome: "Microagulhamento", valorTotal: 350, meioPagamento: "pix", dataAtendimento: "19/03/2026", comissaoEmpresa: 175, comissaoProfissional: 175 },
-  { id: "r6", paciente: "João Lima", profissionalId: "p3", servicoNome: "Criolipólise", valorTotal: 500, meioPagamento: "mercado_pago", dataAtendimento: "19/03/2026", comissaoEmpresa: 250, comissaoProfissional: 250 },
-  { id: "r7", paciente: "Fernanda Costa", profissionalId: "p1", servicoNome: "Depilação a Laser", valorTotal: 200, meioPagamento: "pix", dataAtendimento: "18/03/2026", comissaoEmpresa: 90, comissaoProfissional: 110 },
-  { id: "r8", paciente: "Roberto Alves", profissionalId: "p2", servicoNome: "Limpeza de Pele", valorTotal: 150, meioPagamento: "dinheiro", dataAtendimento: "18/03/2026", comissaoEmpresa: 60, comissaoProfissional: 90 },
-];
-
-const initialRepasses: RepasseProfissional[] = [
-  { id: "rp1", profissionalId: "p1", valorPago: 720, dataPagamento: "15/03/2026", periodoInicio: "01/03/2026", periodoFim: "15/03/2026", observacao: "Quinzena 1 de março" },
-  { id: "rp2", profissionalId: "p2", valorPago: 419, dataPagamento: "15/03/2026", periodoInicio: "01/03/2026", periodoFim: "15/03/2026", observacao: "Quinzena 1 de março" },
-  { id: "rp3", profissionalId: "p3", valorPago: 322, dataPagamento: "15/03/2026", periodoInicio: "01/03/2026", periodoFim: "15/03/2026", observacao: "Quinzena 1 de março" },
-];
-
-const initialAjustes: AjusteFinanceiro[] = [
-  { id: "aj1", profissionalId: "p1", valor: 50, tipo: "adicao", motivo: "Bônus por pontualidade", criadoEm: "18/03/2026" },
-  { id: "aj2", profissionalId: "p2", valor: 30, tipo: "desconto", motivo: "Adiantamento quinzenal", criadoEm: "17/03/2026" },
-];
-
-const initialFechamentos: FechamentoPeriodo[] = [
-  { id: "f1", dataInicio: "01/02/2026", dataFim: "28/02/2026", status: "fechado", criadoEm: "01/03/2026", receitaTotal: 15200, comissaoTotal: 8890 },
-  { id: "f2", dataInicio: "01/03/2026", dataFim: "15/03/2026", status: "fechado", criadoEm: "16/03/2026", receitaTotal: 8750, comissaoTotal: 5120 },
-  { id: "f3", dataInicio: "16/03/2026", dataFim: "31/03/2026", status: "aberto", criadoEm: "16/03/2026", receitaTotal: 2550, comissaoTotal: 1461 },
-];
-
-const meioPagamentoLabels: Record<string, string> = {
+const meioPagamentoLabels: Record<MeioPagamento, string> = {
   dinheiro: "Dinheiro",
   pix: "PIX",
   cartao: "Cartão",
@@ -156,20 +52,7 @@ const CHART_COLORS = [
   "hsl(var(--warning))",
 ];
 
-// ═══════════════════════════════════════════════════
-//  Helpers
-// ═══════════════════════════════════════════════════
-
-function getProfNome(id: string) {
-  return profissionais.find((p) => p.id === id)?.nome || "—";
-}
-function getProfAvatar(id: string) {
-  return profissionais.find((p) => p.id === id)?.avatar || "??";
-}
-
-// ═══════════════════════════════════════════════════
-//  Main Component
-// ═══════════════════════════════════════════════════
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const FinanceiroPage = () => {
   const [activeTab, setActiveTab] = useState("visao-geral");
@@ -206,30 +89,41 @@ const FinanceiroPage = () => {
 
 export default FinanceiroPage;
 
-// ═══════════════════════════════════════════════════
-//  Tab: Visão Geral
-// ═══════════════════════════════════════════════════
+// ─── Tab: Visão Geral ─────────────────────────────────────────────────────────
 
 function VisaoGeral() {
-  const receitaTotal = initialReceitas.reduce((a, r) => a + r.valorTotal, 0);
-  const comissaoTotal = initialReceitas.reduce((a, r) => a + r.comissaoProfissional, 0);
-  const lucroEmpresa = initialReceitas.reduce((a, r) => a + r.comissaoEmpresa, 0);
-  const repassado = initialRepasses.reduce((a, r) => a + r.valorPago, 0);
+  const { data: receitas = [], isLoading } = useReceitas();
+  const { data: repasses = [] } = useRepasses();
+
+  const receitaTotal = receitas.reduce((a, r) => a + r.valor, 0);
+  const comissaoTotal = receitas.reduce((a, r) => a + (r.comissao_profissional_valor ?? 0), 0);
+  const lucroEmpresa = receitas.reduce((a, r) => a + (r.comissao_empresa_valor ?? 0), 0);
+  const repassado = repasses.reduce((a, r) => a + r.valor, 0);
   const saldoPendente = comissaoTotal - repassado;
 
-  const porProfissional = profissionais.map((p) => {
-    const receitas = initialReceitas.filter((r) => r.profissionalId === p.id);
-    const total = receitas.reduce((a, r) => a + r.comissaoProfissional, 0);
-    return { name: p.nome.split(" ").slice(-1)[0], value: total };
-  });
+  // Chart: comissões por profissional
+  const resumo = useFinanceiroResumo(receitas, repasses);
+  const porProfissional = resumo.map((p) => ({
+    name: p.nome.split(" ").slice(-1)[0],
+    value: p.totalComissao,
+  }));
 
+  // Chart: receita por meio de pagamento
   const porMeio = Object.entries(
-    initialReceitas.reduce((acc, r) => {
-      const label = meioPagamentoLabels[r.meioPagamento];
-      acc[label] = (acc[label] || 0) + r.valorTotal;
+    receitas.reduce((acc, r) => {
+      const label = meioPagamentoLabels[r.meio_pagamento] ?? r.meio_pagamento;
+      acc[label] = (acc[label] || 0) + r.valor;
       return acc;
     }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 mt-4">
@@ -256,132 +150,240 @@ function VisaoGeral() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Chart: by Professional */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Comissões por Profissional</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={porProfissional} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: R$${value}`}>
-                    {porProfissional.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Chart: by Payment Method */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Receita por Meio de Pagamento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={porMeio}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent revenues */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Últimas Receitas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {initialReceitas.slice(0, 5).map((r) => (
-              <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
-                    <ArrowUpRight className="h-4 w-4 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{r.servicoNome} — {r.paciente}</p>
-                    <p className="text-xs text-muted-foreground">{r.dataAtendimento} • {meioPagamentoLabels[r.meioPagamento]} • {getProfNome(r.profissionalId)}</p>
-                  </div>
+      {receitas.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+          <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" />
+          <p>Nenhuma receita registrada ainda</p>
+          <p className="text-xs mt-1">Vá para a aba "Receitas" para registrar a primeira</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Comissões por Profissional</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={porProfissional}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ name, value }) => `${name}: R$${(value as number).toFixed(0)}`}
+                      >
+                        {porProfissional.map((_, i) => (
+                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number) => `R$ ${v.toFixed(2)}`}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-success">R$ {r.valorTotal.toFixed(2)}</p>
-                  <p className="text-[10px] text-muted-foreground">Prof: R$ {r.comissaoProfissional.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Receita por Meio de Pagamento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={porMeio}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        formatter={(v: number) => `R$ ${v.toFixed(2)}`}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
+                      />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Recent */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Últimas Receitas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {receitas.slice(0, 5).map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
+                        <ArrowUpRight className="h-4 w-4 text-success" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {r.servicos?.nome ?? r.descricao ?? "—"} — {r.clientes?.nome ?? "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.data_pagamento} • {meioPagamentoLabels[r.meio_pagamento]} • {r.profissionais_clinica?.nome ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-success">R$ {r.valor.toFixed(2)}</p>
+                      {r.comissao_profissional_valor != null && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Prof: R$ {r.comissao_profissional_valor.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Comissões Config
-// ═══════════════════════════════════════════════════
+// ─── Tab: Comissões Config ────────────────────────────────────────────────────
 
 function ComissoesConfig() {
-  const [comissoesServico, setComissoesServico] = useState(initialComissoesServico);
-  const [comissoesPagamento, setComissoesPagamento] = useState(initialComissoesPagamento);
-  const [editingServico, setEditingServico] = useState<string | null>(null);
-  const [editingPagamento, setEditingPagamento] = useState<string | null>(null);
-  const [tempPercEmpresa, setTempPercEmpresa] = useState(0);
-  const [tempPercProf, setTempPercProf] = useState(0);
+  const { data: comissoes = [], isLoading } = useComissoesConfig();
+  const updateComissao = useUpdateComissaoConfig();
 
-  const startEditServico = (cs: ComissaoServico) => {
-    setEditingServico(cs.id);
-    setTempPercEmpresa(cs.percentualEmpresa);
-    setTempPercProf(cs.percentualProfissional);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tempEmpresa, setTempEmpresa] = useState(0);
+  const [tempProf, setTempProf] = useState(0);
+
+  const startEdit = (id: string, perc_empresa: number, perc_profissional: number) => {
+    setEditingId(id);
+    setTempEmpresa(perc_empresa);
+    setTempProf(perc_profissional);
   };
 
-  const saveServico = (id: string) => {
-    if (tempPercEmpresa + tempPercProf > 100) {
-      toast({ title: "Soma dos percentuais não pode ultrapassar 100%", variant: "destructive" });
+  const saveEdit = (id: string) => {
+    if (tempEmpresa + tempProf > 100) {
       return;
     }
-    setComissoesServico((prev) =>
-      prev.map((cs) => cs.id === id ? { ...cs, percentualEmpresa: tempPercEmpresa, percentualProfissional: tempPercProf } : cs)
+    updateComissao.mutate(
+      { id, perc_empresa: tempEmpresa, perc_profissional: tempProf },
+      { onSuccess: () => setEditingId(null) }
     );
-    setEditingServico(null);
-    toast({ title: "Comissão atualizada ✅" });
   };
 
-  const startEditPagamento = (cp: ComissaoPagamento) => {
-    setEditingPagamento(cp.id);
-    setTempPercEmpresa(cp.percentualEmpresa);
-    setTempPercProf(cp.percentualProfissional);
-  };
+  const comissoesServico = comissoes.filter((c) => c.tipo === "servico");
+  const comissoesPagamento = comissoes.filter((c) => c.tipo === "pagamento");
 
-  const savePagamento = (id: string) => {
-    if (tempPercEmpresa + tempPercProf > 100) {
-      toast({ title: "Soma dos percentuais não pode ultrapassar 100%", variant: "destructive" });
-      return;
-    }
-    setComissoesPagamento((prev) =>
-      prev.map((cp) => cp.id === id ? { ...cp, percentualEmpresa: tempPercEmpresa, percentualProfissional: tempPercProf } : cp)
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
-    setEditingPagamento(null);
-    toast({ title: "Comissão atualizada ✅" });
-  };
+  }
+
+  const renderTable = (items: typeof comissoes) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border">
+            <th className="text-left py-2.5 px-3 text-xs text-muted-foreground font-medium">Nome</th>
+            <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Empresa</th>
+            <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Profissional</th>
+            <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium w-20">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((c) => {
+            const nome = c.referencia ?? c.servicos?.nome ?? c.meio_pagamento ?? c.tipo;
+            const isEditing = editingId === c.id;
+            return (
+              <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                <td className="py-2.5 px-3 font-medium text-foreground">{nome}</td>
+                <td className="py-2.5 px-3 text-center">
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      value={tempEmpresa}
+                      onChange={(e) => setTempEmpresa(Number(e.target.value))}
+                      className="h-8 w-20 mx-auto text-center text-xs"
+                      min={0}
+                      max={100}
+                    />
+                  ) : (
+                    <span className="text-foreground">{Number(c.perc_empresa)}%</span>
+                  )}
+                </td>
+                <td className="py-2.5 px-3 text-center">
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      value={tempProf}
+                      onChange={(e) => setTempProf(Number(e.target.value))}
+                      className="h-8 w-20 mx-auto text-center text-xs"
+                      min={0}
+                      max={100}
+                    />
+                  ) : (
+                    <span className="text-foreground">{Number(c.perc_profissional)}%</span>
+                  )}
+                </td>
+                <td className="py-2.5 px-3 text-center">
+                  {isEditing ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => saveEdit(c.id)}
+                      disabled={updateComissao.isPending}
+                      className="h-7 w-7 p-0"
+                    >
+                      {updateComissao.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4 text-success" />
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => startEdit(c.id, Number(c.perc_empresa), Number(c.perc_profissional))}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={4} className="py-8 text-center text-muted-foreground text-xs">
+                Nenhuma comissão configurada — adicione via Supabase ou seed data
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="space-y-6 mt-4">
-      {/* Per service */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -389,55 +391,9 @@ function ComissoesConfig() {
             <CardTitle className="text-sm font-semibold">Comissão por Serviço</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2.5 px-3 text-xs text-muted-foreground font-medium">Serviço</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Empresa</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Profissional</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium w-20">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {comissoesServico.map((cs) => (
-                  <tr key={cs.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="py-2.5 px-3 font-medium text-foreground">{cs.servicoNome}</td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingServico === cs.id ? (
-                        <Input type="number" value={tempPercEmpresa} onChange={(e) => setTempPercEmpresa(Number(e.target.value))} className="h-8 w-20 mx-auto text-center text-xs" min={0} max={100} />
-                      ) : (
-                        <span className="text-foreground">{cs.percentualEmpresa}%</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingServico === cs.id ? (
-                        <Input type="number" value={tempPercProf} onChange={(e) => setTempPercProf(Number(e.target.value))} className="h-8 w-20 mx-auto text-center text-xs" min={0} max={100} />
-                      ) : (
-                        <span className="text-foreground">{cs.percentualProfissional}%</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingServico === cs.id ? (
-                        <Button size="sm" variant="ghost" onClick={() => saveServico(cs.id)} className="h-7 w-7 p-0">
-                          <Check className="h-4 w-4 text-success" />
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="ghost" onClick={() => startEditServico(cs)} className="h-7 w-7 p-0">
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+        <CardContent>{renderTable(comissoesServico)}</CardContent>
       </Card>
 
-      {/* Per payment method */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -445,80 +401,73 @@ function ComissoesConfig() {
             <CardTitle className="text-sm font-semibold">Comissão por Meio de Pagamento</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2.5 px-3 text-xs text-muted-foreground font-medium">Meio de Pagamento</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Empresa</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium">% Profissional</th>
-                  <th className="text-center py-2.5 px-3 text-xs text-muted-foreground font-medium w-20">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {comissoesPagamento.map((cp) => (
-                  <tr key={cp.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="py-2.5 px-3 font-medium text-foreground">{meioPagamentoLabels[cp.meioPagamento]}</td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingPagamento === cp.id ? (
-                        <Input type="number" value={tempPercEmpresa} onChange={(e) => setTempPercEmpresa(Number(e.target.value))} className="h-8 w-20 mx-auto text-center text-xs" min={0} max={100} />
-                      ) : (
-                        <span className="text-foreground">{cp.percentualEmpresa}%</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingPagamento === cp.id ? (
-                        <Input type="number" value={tempPercProf} onChange={(e) => setTempPercProf(Number(e.target.value))} className="h-8 w-20 mx-auto text-center text-xs" min={0} max={100} />
-                      ) : (
-                        <span className="text-foreground">{cp.percentualProfissional}%</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {editingPagamento === cp.id ? (
-                        <Button size="sm" variant="ghost" onClick={() => savePagamento(cp.id)} className="h-7 w-7 p-0">
-                          <Check className="h-4 w-4 text-success" />
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="ghost" onClick={() => startEditPagamento(cp)} className="h-7 w-7 p-0">
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+        <CardContent>{renderTable(comissoesPagamento)}</CardContent>
       </Card>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Receitas
-// ═══════════════════════════════════════════════════
+// ─── Tab: Receitas ────────────────────────────────────────────────────────────
 
 function ReceitasTab() {
-  const [receitas] = useState(initialReceitas);
-  const [filterProf, setFilterProf] = useState("all");
-  const [filterMeio, setFilterMeio] = useState("all");
+  const { data: receitas = [], isLoading } = useReceitas();
+  const { data: profissionais = [] } = useProfissionais();
+  const { data: clientes = [] } = useClientes({ ativo: true });
+  const { data: servicos = [] } = useServicos({ ativo: true });
+  const createReceita = useCreateReceita();
+  const deleteReceita = useDeleteReceita();
 
-  const filtered = receitas.filter((r) => {
-    if (filterProf !== "all" && r.profissionalId !== filterProf) return false;
-    if (filterMeio !== "all" && r.meioPagamento !== filterMeio) return false;
-    return true;
+  const [filterProfId, setFilterProfId] = useState("all");
+  const [filterMeio, setFilterMeio] = useState("all");
+  const [showDialog, setShowDialog] = useState(false);
+
+  // Form
+  const [form, setForm] = useState<Partial<CreateReceitaInput>>({
+    meio_pagamento: "pix",
+    data_pagamento: new Date().toISOString().split("T")[0],
+    valor: 0,
   });
 
-  const totalFiltered = filtered.reduce((a, r) => a + r.valorTotal, 0);
+  const filtered = useMemo(
+    () =>
+      receitas.filter((r) => {
+        if (filterProfId !== "all" && r.profissional_id !== filterProfId) return false;
+        if (filterMeio !== "all" && r.meio_pagamento !== filterMeio) return false;
+        return true;
+      }),
+    [receitas, filterProfId, filterMeio]
+  );
+
+  const totalFiltered = filtered.reduce((a, r) => a + r.valor, 0);
+
+  const handleSave = () => {
+    if (!form.valor || !form.meio_pagamento || !form.data_pagamento) return;
+
+    // Get commission config defaults
+    const profissional = profissionais.find((p) => p.id === form.profissional_id);
+    const _ = profissional; // used to avoid lint warning
+
+    createReceita.mutate(
+      {
+        ...form,
+        valor: Number(form.valor),
+        meio_pagamento: form.meio_pagamento as MeioPagamento,
+        data_pagamento: form.data_pagamento!,
+      } as CreateReceitaInput,
+      {
+        onSuccess: () => {
+          setShowDialog(false);
+          setForm({ meio_pagamento: "pix", data_pagamento: new Date().toISOString().split("T")[0], valor: 0 });
+        },
+      }
+    );
+  };
 
   return (
     <div className="space-y-4 mt-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <Select value={filterProf} onValueChange={setFilterProf}>
-          <SelectTrigger className="w-48 h-9 rounded-xl text-xs">
+      <div className="flex flex-wrap gap-3 items-center">
+        <Select value={filterProfId} onValueChange={setFilterProfId}>
+          <SelectTrigger className="w-48 h-9 rounded-xl text-xs" id="filter-prof-rec">
             <SelectValue placeholder="Profissional" />
           </SelectTrigger>
           <SelectContent>
@@ -529,7 +478,7 @@ function ReceitasTab() {
           </SelectContent>
         </Select>
         <Select value={filterMeio} onValueChange={setFilterMeio}>
-          <SelectTrigger className="w-48 h-9 rounded-xl text-xs">
+          <SelectTrigger className="w-48 h-9 rounded-xl text-xs" id="filter-meio-rec">
             <SelectValue placeholder="Meio de pagamento" />
           </SelectTrigger>
           <SelectContent>
@@ -541,8 +490,22 @@ function ReceitasTab() {
         </Select>
         <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
           <Receipt className="h-4 w-4" />
-          <span>{filtered.length} receitas • <strong className="text-foreground">R$ {totalFiltered.toFixed(2)}</strong></span>
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <span>
+              {filtered.length} receitas •{" "}
+              <strong className="text-foreground">R$ {totalFiltered.toFixed(2)}</strong>
+            </span>
+          )}
         </div>
+        <Button
+          id="btn-nova-receita"
+          className="gap-2 rounded-xl"
+          onClick={() => setShowDialog(true)}
+        >
+          <Plus className="h-4 w-4" /> Nova Receita
+        </Button>
       </div>
 
       <Card>
@@ -559,62 +522,239 @@ function ReceitasTab() {
                   <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium">Valor</th>
                   <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium hidden lg:table-cell">Empresa</th>
                   <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium hidden lg:table-cell">Profissional</th>
+                  <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="py-3 px-4 text-muted-foreground">{r.dataAtendimento}</td>
-                    <td className="py-3 px-4 font-medium text-foreground">{r.paciente}</td>
-                    <td className="py-3 px-4 text-foreground hidden sm:table-cell">{r.servicoNome}</td>
-                    <td className="py-3 px-4 text-foreground hidden md:table-cell">{getProfNome(r.profissionalId)}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="secondary" className="text-[10px]">{meioPagamentoLabels[r.meioPagamento]}</Badge>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </td>
-                    <td className="py-3 px-4 text-right font-semibold text-foreground">R$ {r.valorTotal.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">R$ {r.comissaoEmpresa.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right text-primary font-medium hidden lg:table-cell">R$ {r.comissaoProfissional.toFixed(2)}</td>
                   </tr>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-muted-foreground text-sm">
+                      Nenhuma receita encontrada
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((r) => (
+                    <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="py-3 px-4 text-muted-foreground">{r.data_pagamento}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">{r.clientes?.nome ?? "—"}</td>
+                      <td className="py-3 px-4 text-foreground hidden sm:table-cell">{r.servicos?.nome ?? r.descricao ?? "—"}</td>
+                      <td className="py-3 px-4 text-foreground hidden md:table-cell">{r.profissionais_clinica?.nome ?? "—"}</td>
+                      <td className="py-3 px-4">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {meioPagamentoLabels[r.meio_pagamento]}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right font-semibold text-foreground">R$ {r.valor.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-muted-foreground hidden lg:table-cell">
+                        R$ {(r.comissao_empresa_valor ?? 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-primary font-medium hidden lg:table-cell">
+                        R$ {(r.comissao_profissional_valor ?? 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteReceita.mutate(r.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog: Nova Receita */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Receita</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Paciente</Label>
+                <Select
+                  value={form.paciente_id ?? ""}
+                  onValueChange={(v) => setForm((f) => ({ ...f, paciente_id: v || null }))}
+                >
+                  <SelectTrigger className="mt-1" id="select-paciente-rec">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientes.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Profissional</Label>
+                <Select
+                  value={form.profissional_id ?? ""}
+                  onValueChange={(v) => setForm((f) => ({ ...f, profissional_id: v || null }))}
+                >
+                  <SelectTrigger className="mt-1" id="select-prof-rec">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profissionais.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Serviço</Label>
+              <Select
+                value={form.servico_id ?? ""}
+                onValueChange={(v) => setForm((f) => ({ ...f, servico_id: v || null }))}
+              >
+                <SelectTrigger className="mt-1" id="select-servico-rec">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicos.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Valor (R$) *</Label>
+                <Input
+                  id="input-valor-rec"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={form.valor ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, valor: Number(e.target.value) }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Data *</Label>
+                <Input
+                  id="input-data-rec"
+                  type="date"
+                  value={form.data_pagamento ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, data_pagamento: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Meio de Pagamento *</Label>
+                <Select
+                  value={form.meio_pagamento}
+                  onValueChange={(v) => setForm((f) => ({ ...f, meio_pagamento: v as MeioPagamento }))}
+                >
+                  <SelectTrigger className="mt-1" id="select-meio-rec">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(meioPagamentoLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">% Comissão Profissional</Label>
+                <Input
+                  id="input-comissao-rec"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={form.comissao_profissional_perc ?? ""}
+                  onChange={(e) => {
+                    const percProf = Number(e.target.value);
+                    setForm((f) => ({
+                      ...f,
+                      comissao_profissional_perc: percProf,
+                      comissao_empresa_perc: 100 - percProf,
+                    }));
+                  }}
+                  placeholder="ex: 60"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+            <Button
+              id="btn-salvar-receita"
+              onClick={handleSave}
+              disabled={createReceita.isPending || !form.valor}
+            >
+              {createReceita.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</>
+              ) : (
+                "Registrar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Por Profissional
-// ═══════════════════════════════════════════════════
+// ─── Tab: Por Profissional ────────────────────────────────────────────────────
 
 function PorProfissionalTab() {
-  const profData = profissionais.map((p) => {
-    const receitas = initialReceitas.filter((r) => r.profissionalId === p.id);
-    const totalGanho = receitas.reduce((a, r) => a + r.comissaoProfissional, 0);
-    const totalRepassado = initialRepasses
-      .filter((rp) => rp.profissionalId === p.id)
-      .reduce((a, rp) => a + rp.valorPago, 0);
-    const ajustesAdd = initialAjustes
-      .filter((aj) => aj.profissionalId === p.id && aj.tipo === "adicao")
-      .reduce((a, aj) => a + aj.valor, 0);
-    const ajustesSub = initialAjustes
-      .filter((aj) => aj.profissionalId === p.id && aj.tipo === "desconto")
-      .reduce((a, aj) => a + aj.valor, 0);
-    const saldoPendente = totalGanho + ajustesAdd - ajustesSub - totalRepassado;
-    return { ...p, totalGanho, totalRepassado, ajustesAdd, ajustesSub, saldoPendente, atendimentos: receitas.length };
-  });
+  const { data: receitas = [], isLoading } = useReceitas();
+  const { data: repasses = [] } = useRepasses();
+
+  const resumo = useFinanceiroResumo(receitas, repasses);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (resumo.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground mt-4">
+        <Users className="h-10 w-10 mb-3 opacity-30" />
+        <p>Nenhuma receita registrada ainda</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 mt-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {profData.map((p) => (
-          <Card key={p.id} className="hover:shadow-md transition-shadow">
+        {resumo.map((p) => (
+          <Card key={p.profissional_id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-primary font-bold text-sm">{p.avatar}</span>
+                  <span className="text-primary font-bold text-sm">
+                    {p.nome.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                  </span>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{p.nome}</p>
@@ -625,20 +765,8 @@ function PorProfissionalTab() {
               <div className="space-y-2.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total ganho</span>
-                  <span className="font-medium text-foreground">R$ {p.totalGanho.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">R$ {p.totalComissao.toFixed(2)}</span>
                 </div>
-                {p.ajustesAdd > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">+ Ajustes</span>
-                    <span className="font-medium text-success">R$ {p.ajustesAdd.toFixed(2)}</span>
-                  </div>
-                )}
-                {p.ajustesSub > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">- Descontos</span>
-                    <span className="font-medium text-destructive">R$ {p.ajustesSub.toFixed(2)}</span>
-                  </div>
-                )}
                 <Separator />
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Já repassado</span>
@@ -659,41 +787,48 @@ function PorProfissionalTab() {
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Repasses
-// ═══════════════════════════════════════════════════
+// ─── Tab: Repasses ────────────────────────────────────────────────────────────
 
 function RepassesTab() {
-  const [repasses, setRepasses] = useState(initialRepasses);
+  const { data: repasses = [], isLoading } = useRepasses();
+  const { data: profissionais = [] } = useProfissionais();
+  const createRepasse = useCreateRepasse();
+
   const [showDialog, setShowDialog] = useState(false);
-  const [newRepasse, setNewRepasse] = useState({ profissionalId: "", valorPago: "", periodoInicio: "", periodoFim: "", observacao: "" });
+  const [form, setForm] = useState({
+    profissional_id: "",
+    valor: "",
+    periodo_inicio: "",
+    periodo_fim: "",
+    meio_pagamento: "pix" as MeioPagamento,
+    observacoes: "",
+  });
 
   const handleSave = () => {
-    if (!newRepasse.profissionalId || !newRepasse.valorPago) {
-      toast({ title: "Preencha profissional e valor", variant: "destructive" });
-      return;
-    }
-    const repasse: RepasseProfissional = {
-      id: `rp${Date.now()}`,
-      profissionalId: newRepasse.profissionalId,
-      valorPago: Number(newRepasse.valorPago),
-      dataPagamento: new Date().toLocaleDateString("pt-BR"),
-      periodoInicio: newRepasse.periodoInicio,
-      periodoFim: newRepasse.periodoFim,
-      observacao: newRepasse.observacao,
-    };
-    setRepasses((prev) => [repasse, ...prev]);
-    setShowDialog(false);
-    setNewRepasse({ profissionalId: "", valorPago: "", periodoInicio: "", periodoFim: "", observacao: "" });
-    toast({ title: "Repasse registrado! ✅" });
+    if (!form.profissional_id || !form.valor || !form.periodo_inicio || !form.periodo_fim) return;
+    createRepasse.mutate(
+      {
+        profissional_id: form.profissional_id,
+        valor: Number(form.valor),
+        periodo_inicio: form.periodo_inicio,
+        periodo_fim: form.periodo_fim,
+        meio_pagamento: form.meio_pagamento,
+        observacoes: form.observacoes,
+      },
+      {
+        onSuccess: () => {
+          setShowDialog(false);
+          setForm({ profissional_id: "", valor: "", periodo_inicio: "", periodo_fim: "", meio_pagamento: "pix", observacoes: "" });
+        },
+      }
+    );
   };
 
   return (
     <div className="space-y-4 mt-4">
       <div className="flex justify-end">
-        <Button className="gap-2 rounded-xl" onClick={() => setShowDialog(true)}>
-          <Plus className="h-4 w-4" />
-          Novo Repasse
+        <Button id="btn-novo-repasse" className="gap-2 rounded-xl" onClick={() => setShowDialog(true)}>
+          <Plus className="h-4 w-4" /> Novo Repasse
         </Button>
       </div>
 
@@ -711,22 +846,36 @@ function RepassesTab() {
                 </tr>
               </thead>
               <tbody>
-                {repasses.map((rp) => (
-                  <tr key={rp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                          {getProfAvatar(rp.profissionalId)}
-                        </div>
-                        <span className="font-medium text-foreground">{getProfNome(rp.profissionalId)}</span>
-                      </div>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </td>
-                    <td className="py-3 px-4 text-muted-foreground text-xs">{rp.periodoInicio} — {rp.periodoFim}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden sm:table-cell">{rp.dataPagamento}</td>
-                    <td className="py-3 px-4 text-muted-foreground text-xs hidden md:table-cell">{rp.observacao}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-success">R$ {rp.valorPago.toFixed(2)}</td>
                   </tr>
-                ))}
+                ) : repasses.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                      Nenhum repasse registrado
+                    </td>
+                  </tr>
+                ) : (
+                  repasses.map((rp) => (
+                    <tr key={rp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                            {(rp.profissionais_clinica?.nome ?? "?").split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                          </div>
+                          <span className="font-medium text-foreground">{rp.profissionais_clinica?.nome ?? "—"}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground text-xs">{rp.periodo_inicio} — {rp.periodo_fim}</td>
+                      <td className="py-3 px-4 text-muted-foreground hidden sm:table-cell">{rp.data_pagamento ?? "—"}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-xs hidden md:table-cell">{rp.observacoes ?? "—"}</td>
+                      <td className="py-3 px-4 text-right font-semibold text-success">R$ {rp.valor.toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -740,9 +889,14 @@ function RepassesTab() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-xs">Profissional</Label>
-              <Select value={newRepasse.profissionalId} onValueChange={(v) => setNewRepasse((p) => ({ ...p, profissionalId: v }))}>
-                <SelectTrigger className="mt-1 rounded-xl"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Label className="text-xs">Profissional *</Label>
+              <Select
+                value={form.profissional_id}
+                onValueChange={(v) => setForm((f) => ({ ...f, profissional_id: v }))}
+              >
+                <SelectTrigger className="mt-1 rounded-xl" id="select-prof-repasse">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
                   {profissionais.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
@@ -750,28 +904,84 @@ function RepassesTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Valor (R$)</Label>
-              <Input type="number" value={newRepasse.valorPago} onChange={(e) => setNewRepasse((p) => ({ ...p, valorPago: e.target.value }))} className="mt-1 rounded-xl" placeholder="0.00" min={0} step={0.01} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Valor (R$) *</Label>
+                <Input
+                  id="input-valor-repasse"
+                  type="number"
+                  value={form.valor}
+                  onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value }))}
+                  className="mt-1 rounded-xl"
+                  placeholder="0.00"
+                  min={0}
+                  step={0.01}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Meio de Pagamento</Label>
+                <Select
+                  value={form.meio_pagamento}
+                  onValueChange={(v) => setForm((f) => ({ ...f, meio_pagamento: v as MeioPagamento }))}
+                >
+                  <SelectTrigger className="mt-1 rounded-xl" id="select-meio-repasse">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(meioPagamentoLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Período início</Label>
-                <Input type="date" value={newRepasse.periodoInicio} onChange={(e) => setNewRepasse((p) => ({ ...p, periodoInicio: e.target.value }))} className="mt-1 rounded-xl" />
+                <Label className="text-xs">Período início *</Label>
+                <Input
+                  id="input-periodo-inicio"
+                  type="date"
+                  value={form.periodo_inicio}
+                  onChange={(e) => setForm((f) => ({ ...f, periodo_inicio: e.target.value }))}
+                  className="mt-1 rounded-xl"
+                />
               </div>
               <div>
-                <Label className="text-xs">Período fim</Label>
-                <Input type="date" value={newRepasse.periodoFim} onChange={(e) => setNewRepasse((p) => ({ ...p, periodoFim: e.target.value }))} className="mt-1 rounded-xl" />
+                <Label className="text-xs">Período fim *</Label>
+                <Input
+                  id="input-periodo-fim"
+                  type="date"
+                  value={form.periodo_fim}
+                  onChange={(e) => setForm((f) => ({ ...f, periodo_fim: e.target.value }))}
+                  className="mt-1 rounded-xl"
+                />
               </div>
             </div>
             <div>
               <Label className="text-xs">Observação</Label>
-              <Textarea value={newRepasse.observacao} onChange={(e) => setNewRepasse((p) => ({ ...p, observacao: e.target.value }))} className="mt-1 rounded-xl" rows={2} />
+              <Textarea
+                id="textarea-obs-repasse"
+                value={form.observacoes}
+                onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
+                className="mt-1 rounded-xl"
+                rows={2}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl">Cancelar</Button>
-            <Button onClick={handleSave} className="rounded-xl">Salvar Repasse</Button>
+            <Button
+              id="btn-salvar-repasse"
+              onClick={handleSave}
+              disabled={createRepasse.isPending || !form.profissional_id || !form.valor}
+              className="rounded-xl"
+            >
+              {createRepasse.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</>
+              ) : (
+                "Salvar Repasse"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -779,75 +989,101 @@ function RepassesTab() {
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Ajustes
-// ═══════════════════════════════════════════════════
+// ─── Tab: Ajustes (UI simulation — DB table pending) ─────────────────────────
+
+interface AjusteLocal {
+  id: string;
+  profissionale: string;
+  valor: number;
+  tipo: "adicao" | "desconto";
+  motivo: string;
+  criadoEm: string;
+}
 
 function AjustesTab() {
-  const [ajustes, setAjustes] = useState(initialAjustes);
+  const { data: profissionais = [] } = useProfissionais();
+  const [ajustes, setAjustes] = useState<AjusteLocal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
-  const [newAjuste, setNewAjuste] = useState({ profissionalId: "", valor: "", tipo: "adicao" as "adicao" | "desconto", motivo: "" });
+  const [form, setForm] = useState({
+    profissionalId: "",
+    valor: "",
+    tipo: "adicao" as "adicao" | "desconto",
+    motivo: "",
+  });
 
   const handleSave = () => {
-    if (!newAjuste.profissionalId || !newAjuste.valor || !newAjuste.motivo.trim()) {
-      toast({ title: "Preencha todos os campos (motivo é obrigatório)", variant: "destructive" });
-      return;
-    }
-    const ajuste: AjusteFinanceiro = {
-      id: `aj${Date.now()}`,
-      profissionalId: newAjuste.profissionalId,
-      valor: Number(newAjuste.valor),
-      tipo: newAjuste.tipo,
-      motivo: newAjuste.motivo,
-      criadoEm: new Date().toLocaleDateString("pt-BR"),
-    };
-    setAjustes((prev) => [ajuste, ...prev]);
+    if (!form.profissionalId || !form.valor || !form.motivo.trim()) return;
+    const nome = profissionais.find((p) => p.id === form.profissionalId)?.nome ?? "—";
+    setAjustes((prev) => [
+      {
+        id: Date.now().toString(),
+        profissionale: nome,
+        valor: Number(form.valor),
+        tipo: form.tipo,
+        motivo: form.motivo,
+        criadoEm: new Date().toLocaleDateString("pt-BR"),
+      },
+      ...prev,
+    ]);
     setShowDialog(false);
-    setNewAjuste({ profissionalId: "", valor: "", tipo: "adicao", motivo: "" });
-    toast({ title: "Ajuste registrado! ✅" });
+    setForm({ profissionalId: "", valor: "", tipo: "adicao", motivo: "" });
   };
 
   return (
     <div className="space-y-4 mt-4">
-      <div className="flex justify-end">
-        <Button className="gap-2 rounded-xl" onClick={() => setShowDialog(true)}>
-          <Plus className="h-4 w-4" />
-          Novo Ajuste
+      <div className="flex justify-between items-center">
+        <p className="text-xs text-muted-foreground">
+          Ajustes manuais (bônus e descontos) — persistência em DB em breve
+        </p>
+        <Button id="btn-novo-ajuste" className="gap-2 rounded-xl" onClick={() => setShowDialog(true)}>
+          <Plus className="h-4 w-4" /> Novo Ajuste
         </Button>
       </div>
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Profissional</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Tipo</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium hidden sm:table-cell">Motivo</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium hidden md:table-cell">Data</th>
-                  <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium">Valor</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Profissional</th>
+                <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Tipo</th>
+                <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Motivo</th>
+                <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium">Data</th>
+                <th className="text-right py-3 px-4 text-xs text-muted-foreground font-medium">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ajustes.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                    Nenhum ajuste registrado
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {ajustes.map((aj) => (
+              ) : (
+                ajustes.map((aj) => (
                   <tr key={aj.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="py-3 px-4 font-medium text-foreground">{getProfNome(aj.profissionalId)}</td>
+                    <td className="py-3 px-4 font-medium text-foreground">{aj.profissionale}</td>
                     <td className="py-3 px-4">
-                      <Badge variant={aj.tipo === "adicao" ? "default" : "destructive"} className="text-[10px]">
-                        {aj.tipo === "adicao" ? "Adição" : "Desconto"}
+                      <Badge
+                        variant="outline"
+                        className={aj.tipo === "adicao"
+                          ? "border-success/50 text-success"
+                          : "border-destructive/50 text-destructive"
+                        }
+                      >
+                        {aj.tipo === "adicao" ? "+ Bônus" : "- Desconto"}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-muted-foreground text-xs hidden sm:table-cell">{aj.motivo}</td>
-                    <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{aj.criadoEm}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{aj.motivo}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{aj.criadoEm}</td>
                     <td className={cn("py-3 px-4 text-right font-semibold", aj.tipo === "adicao" ? "text-success" : "text-destructive")}>
-                      {aj.tipo === "adicao" ? "+" : "-"} R$ {aj.valor.toFixed(2)}
+                      {aj.tipo === "adicao" ? "+" : "-"}R$ {aj.valor.toFixed(2)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
 
@@ -858,9 +1094,14 @@ function AjustesTab() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-xs">Profissional</Label>
-              <Select value={newAjuste.profissionalId} onValueChange={(v) => setNewAjuste((p) => ({ ...p, profissionalId: v }))}>
-                <SelectTrigger className="mt-1 rounded-xl"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Label className="text-xs">Profissional *</Label>
+              <Select
+                value={form.profissionalId}
+                onValueChange={(v) => setForm((f) => ({ ...f, profissionalId: v }))}
+              >
+                <SelectTrigger className="mt-1" id="select-prof-ajuste">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
                   {profissionais.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
@@ -868,28 +1109,51 @@ function AjustesTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select value={newAjuste.tipo} onValueChange={(v) => setNewAjuste((p) => ({ ...p, tipo: v as "adicao" | "desconto" }))}>
-                <SelectTrigger className="mt-1 rounded-xl"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="adicao">Adição (bônus)</SelectItem>
-                  <SelectItem value="desconto">Desconto</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select
+                  value={form.tipo}
+                  onValueChange={(v) => setForm((f) => ({ ...f, tipo: v as "adicao" | "desconto" }))}
+                >
+                  <SelectTrigger className="mt-1" id="select-tipo-ajuste">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adicao">Bônus / Adição</SelectItem>
+                    <SelectItem value="desconto">Desconto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Valor (R$) *</Label>
+                <Input
+                  id="input-valor-ajuste"
+                  type="number"
+                  value={form.valor}
+                  onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value }))}
+                  className="mt-1"
+                  min={0}
+                  step={0.01}
+                />
+              </div>
             </div>
             <div>
-              <Label className="text-xs">Valor (R$)</Label>
-              <Input type="number" value={newAjuste.valor} onChange={(e) => setNewAjuste((p) => ({ ...p, valor: e.target.value }))} className="mt-1 rounded-xl" placeholder="0.00" min={0} step={0.01} />
-            </div>
-            <div>
-              <Label className="text-xs">Motivo (obrigatório)</Label>
-              <Textarea value={newAjuste.motivo} onChange={(e) => setNewAjuste((p) => ({ ...p, motivo: e.target.value }))} className="mt-1 rounded-xl" rows={2} placeholder="Descreva o motivo do ajuste..." />
+              <Label className="text-xs">Motivo *</Label>
+              <Input
+                id="input-motivo-ajuste"
+                value={form.motivo}
+                onChange={(e) => setForm((f) => ({ ...f, motivo: e.target.value }))}
+                className="mt-1"
+                placeholder="Descreva o motivo do ajuste..."
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl">Cancelar</Button>
-            <Button onClick={handleSave} className="rounded-xl">Salvar Ajuste</Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+            <Button id="btn-salvar-ajuste" onClick={handleSave} disabled={!form.profissionalId || !form.valor || !form.motivo}>
+              Registrar Ajuste
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -897,112 +1161,42 @@ function AjustesTab() {
   );
 }
 
-// ═══════════════════════════════════════════════════
-//  Tab: Fechamento
-// ═══════════════════════════════════════════════════
+// ─── Tab: Fechamento (UI simulation) ─────────────────────────────────────────
 
 function FechamentoTab() {
-  const [fechamentos, setFechamentos] = useState(initialFechamentos);
-  const [showDialog, setShowDialog] = useState(false);
-  const [newFechamento, setNewFechamento] = useState({ dataInicio: "", dataFim: "" });
+  const { data: receitas = [] } = useReceitas();
+  const { data: repasses = [] } = useRepasses();
 
-  const handleClose = () => {
-    if (!newFechamento.dataInicio || !newFechamento.dataFim) {
-      toast({ title: "Preencha as datas", variant: "destructive" });
-      return;
-    }
-    const f: FechamentoPeriodo = {
-      id: `f${Date.now()}`,
-      dataInicio: new Date(newFechamento.dataInicio).toLocaleDateString("pt-BR"),
-      dataFim: new Date(newFechamento.dataFim).toLocaleDateString("pt-BR"),
-      status: "fechado",
-      criadoEm: new Date().toLocaleDateString("pt-BR"),
-      receitaTotal: initialReceitas.reduce((a, r) => a + r.valorTotal, 0),
-      comissaoTotal: initialReceitas.reduce((a, r) => a + r.comissaoProfissional, 0),
-    };
-    setFechamentos((prev) => [f, ...prev]);
-    setShowDialog(false);
-    setNewFechamento({ dataInicio: "", dataFim: "" });
-    toast({ title: "Período fechado! 🔒", description: "Os valores deste período não poderão mais ser alterados." });
-  };
+  const receitaTotal = receitas.reduce((a, r) => a + r.valor, 0);
+  const comissaoTotal = receitas.reduce((a, r) => a + (r.comissao_profissional_valor ?? 0), 0);
+  const repassado = repasses.reduce((a, r) => a + r.valor, 0);
+  const pendente = comissaoTotal - repassado;
 
   return (
     <div className="space-y-4 mt-4">
-      <div className="flex justify-end">
-        <Button className="gap-2 rounded-xl" onClick={() => setShowDialog(true)}>
-          <Lock className="h-4 w-4" />
-          Fechar Período
-        </Button>
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+        <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+        <p className="text-muted-foreground">
+          Gestão de períodos de fechamento — integração DB em breve
+        </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {fechamentos.map((f) => (
-          <Card key={f.id} className={cn("transition-shadow", f.status === "fechado" && "opacity-80")}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">{f.dataInicio} — {f.dataFim}</span>
-                </div>
-                <Badge variant={f.status === "fechado" ? "secondary" : "default"} className="text-[10px]">
-                  {f.status === "fechado" ? (
-                    <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> Fechado</span>
-                  ) : "Aberto"}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Receita total</span>
-                  <span className="font-medium text-foreground">R$ {f.receitaTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Comissões pagas</span>
-                  <span className="font-medium text-primary">R$ {f.comissaoTotal.toFixed(2)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Lucro empresa</span>
-                  <span className="font-bold text-success">R$ {(f.receitaTotal - f.comissaoTotal).toFixed(2)}</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-3">Fechado em {f.criadoEm}</p>
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Receita do Período", value: receitaTotal, color: "text-success" },
+          { label: "Comissões Totais", value: comissaoTotal, color: "text-primary" },
+          { label: "Já Repassado", value: repassado, color: "text-muted-foreground" },
+          { label: "Pendente", value: pendente, color: pendente > 0 ? "text-warning" : "text-success" },
+        ].map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+              <p className={cn("text-xl font-bold", s.color)}>R$ {s.value.toFixed(2)}</p>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-warning" />
-              Fechar Período Financeiro
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Ao fechar um período, os valores de comissão e repasse não poderão ser alterados. Essa ação é irreversível.
-          </p>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Data início</Label>
-                <Input type="date" value={newFechamento.dataInicio} onChange={(e) => setNewFechamento((p) => ({ ...p, dataInicio: e.target.value }))} className="mt-1 rounded-xl" />
-              </div>
-              <div>
-                <Label className="text-xs">Data fim</Label>
-                <Input type="date" value={newFechamento.dataFim} onChange={(e) => setNewFechamento((p) => ({ ...p, dataFim: e.target.value }))} className="mt-1 rounded-xl" />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} className="rounded-xl">Cancelar</Button>
-            <Button onClick={handleClose} className="rounded-xl gap-2" variant="destructive">
-              <Lock className="h-4 w-4" />
-              Confirmar Fechamento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
