@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +10,21 @@ import logo from "@/assets/logo-agendme.png";
 export default function ClientLoginPage() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (isLogin) {
+         navigate(slug ? `/app/${slug}` : "/app", { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate, slug, isLogin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +40,7 @@ export default function ClientLoginPage() {
         toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
       } else {
         toast({ title: "Login realizado!" });
-        navigate(slug ? `/app/${slug}` : "/app");
+        // navigation is handled by useEffect when user state is updated
       }
     } else {
       const { error } = await signUp(email, senha, { nome, telefone });
