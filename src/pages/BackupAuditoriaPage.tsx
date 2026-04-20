@@ -16,7 +16,7 @@ import {
   CheckCircle2, XCircle, Search, FileText, Plus, Eye, Trash2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuditLog } from "@/hooks/use-relatorios";
+import { useSaasAuditLogs } from "@/hooks/use-saas";
 
 
 // --- Mock Data ---
@@ -67,10 +67,10 @@ export default function BackupAuditoriaPage() {
   const [restoreDialog, setRestoreDialog] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
 
-  const { data: auditLogsReal = [], isLoading: loadingAudit } = useAuditLog(100, filterModulo !== "todos" ? filterModulo : undefined);
+  const { data: auditLogsReal = [], isLoading: loadingAudit } = useSaasAuditLogs(100, filterModulo !== "todos" ? filterModulo : undefined);
 
   // Use real logs if available, else fallback to mock for UI demonstration
-  const logsSource = auditLogsReal.length > 0 ? auditLogsReal.map(l => ({
+  const logsSource = auditLogsReal.length > 0 ? auditLogsReal.map((l: any) => ({
     id: l.id,
     usuario: l.user_id ? l.user_id.slice(0, 8) + "..." : "Sistema",
     modulo: l.tabela || l.origem || "sistema",
