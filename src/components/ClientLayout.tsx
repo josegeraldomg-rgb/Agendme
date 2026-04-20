@@ -53,15 +53,19 @@ function ClientNotFound() {
 
 function ClientLayoutInner() {
   const { empresa } = useClientEmpresa();
+  const location = useLocation();
+  const { slug } = useParams<{ slug: string }>();
 
   if (!empresa) return <ClientNotFound />;
 
+  const isLoginPage = location.pathname === `/app/${slug}/login`;
+
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-lg mx-auto relative">
-      <main className="flex-1 pb-20">
+      <main className={isLoginPage ? "flex-1" : "flex-1 pb-20"}>
         <Outlet />
       </main>
-      <ClientNavBar />
+      {!isLoginPage && <ClientNavBar />}
     </div>
   );
 }

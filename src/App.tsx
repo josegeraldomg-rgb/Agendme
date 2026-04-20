@@ -81,9 +81,9 @@ const App = () => (
               <Route path="/webhooks" element={<WebhooksPage />} />
             </Route>
             {/* Client app routes */}
-            <Route path="/app/login" element={<ClientLoginPage />} />
             <Route path="/app/:slug" element={<ClientLayout />}>
               <Route index element={<ClientHomePage />} />
+              <Route path="login" element={<ClientLoginPage />} />
               <Route path="categoria/:id" element={<ClientCategoryPage />} />
               <Route path="servico/:id" element={<ClientServiceDetailPage />} />
               <Route path="agendar" element={<ClientBookingFlowPage />} />

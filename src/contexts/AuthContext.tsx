@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -30,6 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Flag to prevent getSession from overwriting state already set by onAuthStateChange
+  // This fixes a race condition that causes infinite loading in production (Vercel cold starts)
+  const initializedRef = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
@@ -63,10 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }, 3000);
 
-    // Listen for auth state changes
+    // onAuthStateChange is the source of truth for session changes.
+    // It fires first on page load with the persisted session (INITIAL_SESSION event).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         try {
+          initializedRef.current = true; // Mark as initialized so getSession below is skipped
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
@@ -82,8 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Load initial session
+    // getSession is a fallback for environments where onAuthStateChange
+    // may not fire (e.g. Safari private mode). Skip if already initialized.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (initializedRef.current) return; // onAuthStateChange already handled this
       try {
         setSession(session);
         setUser(session?.user ?? null);

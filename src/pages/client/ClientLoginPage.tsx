@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import logo from "@/assets/logo-agendme.png";
 
 export default function ClientLoginPage() {
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug: string }>();
   const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ export default function ClientLoginPage() {
         toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
       } else {
         toast({ title: "Login realizado!" });
-        navigate("/app");
+        navigate(slug ? `/app/${slug}` : "/app");
       }
     } else {
       const { error } = await signUp(email, senha, { nome, telefone });
