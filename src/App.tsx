@@ -104,6 +104,8 @@ const App = () => (
               <Route path="/saas/backup" element={<BackupAuditoriaPage />} />
               <Route path="/saas/cache" element={<SaasCachePage />} />
             </Route>
+            {/* Fallback: /app/login sem slug (link antigo) → redireciona para landing */}
+            <Route path="/app/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
