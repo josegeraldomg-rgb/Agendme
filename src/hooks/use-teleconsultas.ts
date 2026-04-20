@@ -83,6 +83,46 @@ export function useTeleconsultaChat(teleconsultaId: string) {
       return data || [];
     },
     enabled: !!teleconsultaId,
-    // Polling if needed, but since Jitsi has chat we might just rely on real-time channels or just not use DB chat when active.
+  });
+}
+
+export function useCreateTeleconsulta() {
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const empresaId = session?.user?.user_metadata?.empresa_id;
+
+  return useMutation({
+    mutationFn: async ({ paciente_id, profissional_id, data, hora }: {
+      paciente_id: string;
+      profissional_id: string;
+      data: string;
+      hora: string;
+    }) => {
+      if (!empresaId) throw new Error("Empresa não encontrada");
+
+      // Gerar sala Jitsi com ID único
+      const salaId = `agendme-${empresaId.slice(0, 8)}-${Date.now()}`;
+      const linkSala = `https://meet.jit.si/${salaId}`;
+
+      const { error } = await supabase.from("teleconsultas").insert({
+        empresa_id: empresaId,
+        paciente_id,
+        profissional_id,
+        data,
+        hora,
+        link_sala: linkSala,
+        link_sala_paciente: linkSala,
+        sala_id_externo: salaId,
+        provedor: "jitsi",
+        status: "criada",
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teleconsultas"] });
+      toast({ title: "Teleconsulta criada!", description: "O link da sala foi gerado automaticamente." });
+    },
+    onError: (e: Error) => toast({ title: "Erro ao criar", description: e.message, variant: "destructive" }),
   });
 }

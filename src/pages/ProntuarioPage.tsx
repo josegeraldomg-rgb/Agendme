@@ -144,7 +144,7 @@ const ProntuarioPage = () => {
               <Stethoscope className="h-6 w-6 text-primary" />
               Prontuário Digital
             </h1>
-            <p className="text-muted-foreground text-sm">Registros clínicos com suporte de IA</p>
+            <p className="text-muted-foreground text-sm">Registros clínicos dos pacientes</p>
           </div>
           <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
             <DialogTrigger asChild>

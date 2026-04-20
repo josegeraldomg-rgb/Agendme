@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Search, MoreHorizontal } from "lucide-react";
+import { Plus, Search, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClientes, useCreateCliente, useUpdateCliente } from "@/hooks/use-clientes";
@@ -15,14 +15,22 @@ const PacientesPage = () => {
   const updateCliente = useUpdateCliente();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [form, setForm] = useState({ nome: "", email: "", telefone: "", data_nascimento: "" });
 
-  const filtered = (pacientes || []).filter(
-    (p) =>
-      p.nome.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase()) ||
-      (p.telefone || "").includes(search)
-  );
+  const filtered = useMemo(() => {
+    setPage(1); // reset on search change
+    return (pacientes || []).filter(
+      (p) =>
+        p.nome.toLowerCase().includes(search.toLowerCase()) ||
+        p.email.toLowerCase().includes(search.toLowerCase()) ||
+        (p.telefone || "").includes(search)
+    );
+  }, [pacientes, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const handleCreate = () => {
     if (!form.nome || !form.email) return;
@@ -58,6 +66,7 @@ const PacientesPage = () => {
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -70,7 +79,7 @@ const PacientesPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((p) => (
+                  {paginated.map((p) => (
                     <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors cursor-pointer">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-3">
@@ -110,6 +119,38 @@ const PacientesPage = () => {
                 </tbody>
               </table>
             </div>
+            {/* Paginação */}
+            {filtered.length > pageSize && (
+              <div className="flex items-center justify-between pt-4 border-t border-border mt-2">
+                <p className="text-xs text-muted-foreground">
+                  Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} de {filtered.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 text-xs"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 text-xs"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Próxima <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

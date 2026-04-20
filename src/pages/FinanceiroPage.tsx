@@ -38,10 +38,12 @@ import { useServicos } from "@/hooks/use-servicos";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const meioPagamentoLabels: Record<MeioPagamento, string> = {
+const meioPagamentoLabels: Record<string, string> = {
   dinheiro: "Dinheiro",
   pix: "PIX",
   cartao: "Cartão",
+  cartao_credito: "Cartão de Crédito",
+  cartao_debito: "Cartão de Débito",
   mercado_pago: "Mercado Pago",
 };
 
@@ -235,7 +237,7 @@ function VisaoGeral() {
                           {r.servicos?.nome ?? r.descricao ?? "—"} — {r.clientes?.nome ?? "—"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {r.data_pagamento} • {meioPagamentoLabels[r.meio_pagamento]} • {r.profissionais_clinica?.nome ?? "—"}
+                          {r.data_pagamento} • {meioPagamentoLabels[r.meio_pagamento] ?? r.meio_pagamento} • {r.profissionais_clinica?.nome ?? "—"}
                         </p>
                       </div>
                     </div>

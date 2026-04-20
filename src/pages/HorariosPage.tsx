@@ -251,9 +251,9 @@ const HorariosPage = () => {
                           </p>
                           {horario ? (
                             <>
-                              <p className="text-[11px] text-foreground font-medium">{horario.hora_inicio}</p>
+                              <p className="text-[11px] text-foreground font-medium">{horario.hora_inicio.slice(0, 5)}</p>
                               <p className="text-[10px] text-muted-foreground">às</p>
-                              <p className="text-[11px] text-foreground font-medium">{horario.hora_fim}</p>
+                              <p className="text-[11px] text-foreground font-medium">{horario.hora_fim.slice(0, 5)}</p>
                               <Badge variant={isActive ? "default" : "secondary"} className="text-[9px] mt-1.5 px-1.5">
                                 {horario.intervalo_minutos}min
                               </Badge>
@@ -292,12 +292,12 @@ const HorariosPage = () => {
                               </div>
                               <div className="flex items-center gap-2 text-sm text-foreground">
                                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span>{h.hora_inicio} — {h.hora_fim}</span>
+                                <span>{h.hora_inicio.slice(0, 5)} — {h.hora_fim.slice(0, 5)}</span>
                               </div>
                               <Badge variant="outline" className="text-xs">
                                 Intervalo: {h.intervalo_minutos}min
                               </Badge>
-                              <span className="text-xs text-muted-foreground">{slots} slots • {(totalMin / 60).toFixed(1)}h</span>
+                              <span className="text-xs text-muted-foreground">{slots} slots • {Math.round(totalMin / 60)}h</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Switch
@@ -375,7 +375,7 @@ const HorariosPage = () => {
                   const totalMin = hf * 60 + mf - hi * 60 - mi;
                   if (totalMin <= 0) return "Horário inválido";
                   const slots = Math.floor(totalMin / form.intervalo_minutos);
-                  return `${slots} slots de ${form.intervalo_minutos}min • ${(totalMin / 60).toFixed(1)}h de atendimento`;
+                  return `${slots} slots de ${form.intervalo_minutos}min • ${Math.round(totalMin / 60)}h de atendimento`;
                 })()}
               </p>
             </div>

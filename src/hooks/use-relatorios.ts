@@ -199,3 +199,186 @@ export function useAuditLog(limit = 50, modulo?: string) {
     enabled: !!empresaId,
   });
 }
+
+// ── Receita por meio de pagamento ──
+
+const MEIO_PAGAMENTO_LABELS: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  cartao: "Cartão",
+  cartao_credito: "Cartão de Crédito",
+  cartao_debito: "Cartão de Débito",
+  mercado_pago: "Mercado Pago",
+};
+
+const CHART_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5, var(--muted-foreground)))",
+];
+
+export function useReceitaPorMeio() {
+  const empresaId = useEmpresaId();
+
+  return useQuery({
+    queryKey: ["relatorios_receita_por_meio", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+
+      const { data } = await supabase
+        .from("financeiro_receitas")
+        .select("valor, meio_pagamento")
+        .eq("empresa_id", empresaId);
+
+      const agrupado: Record<string, number> = {};
+      for (const r of data || []) {
+        const label = MEIO_PAGAMENTO_LABELS[r.meio_pagamento] ?? r.meio_pagamento;
+        agrupado[label] = (agrupado[label] || 0) + Number(r.valor || 0);
+      }
+
+      return Object.entries(agrupado).map(([nome, valor], i) => ({
+        nome,
+        valor,
+        cor: CHART_COLORS[i % CHART_COLORS.length],
+      }));
+    },
+    enabled: !!empresaId,
+  });
+}
+
+// ── Ocupação semanal ──
+
+export function useOcupacaoSemanal() {
+  const empresaId = useEmpresaId();
+
+  return useQuery({
+    queryKey: ["relatorios_ocupacao_semanal", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+
+      const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+      // Buscar agendamentos do mês atual
+      const inicio = new Date();
+      inicio.setDate(1);
+      inicio.setHours(0, 0, 0, 0);
+
+      const { data: agendamentos } = await supabase
+        .from("agendamentos_clinica")
+        .select("data, status")
+        .eq("empresa_id", empresaId)
+        .gte("data", inicio.toISOString().split("T")[0]);
+
+      const porDia: Record<string, { total: number; concluidos: number }> = {};
+      for (const d of DIAS) porDia[d] = { total: 0, concluidos: 0 };
+
+      for (const a of agendamentos || []) {
+        const dia = DIAS[new Date(a.data + "T12:00:00").getDay()];
+        porDia[dia].total++;
+        if (a.status === "concluido" || a.status === "confirmado" || a.status === "em_atendimento") {
+          porDia[dia].concluidos++;
+        }
+      }
+
+      return ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((dia) => ({
+        dia,
+        ocupacao: porDia[dia].total > 0
+          ? Math.round((porDia[dia].concluidos / porDia[dia].total) * 100)
+          : 0,
+      }));
+    },
+    enabled: !!empresaId,
+  });
+}
+
+// ── Faltas vs confirmações por mês ──
+
+export function useFaltasVsConfirmacoes() {
+  const empresaId = useEmpresaId();
+
+  return useQuery({
+    queryKey: ["relatorios_faltas_confirmacoes", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+
+      const hoje = new Date();
+      const meses = [];
+
+      for (let i = 5; i >= 0; i--) {
+        const ref = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const fim = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 0);
+
+        const { data } = await supabase
+          .from("agendamentos_clinica")
+          .select("status")
+          .eq("empresa_id", empresaId)
+          .gte("data", ref.toISOString().split("T")[0])
+          .lte("data", fim.toISOString().split("T")[0]);
+
+        const total = data?.length || 1;
+        const faltas = data?.filter((a) => a.status === "faltou").length || 0;
+        const confirmados = data?.filter((a) =>
+          ["confirmado", "concluido", "em_atendimento"].includes(a.status)
+        ).length || 0;
+
+        const mes = ref.toLocaleDateString("pt-BR", { month: "short" });
+        meses.push({
+          mes: mes.charAt(0).toUpperCase() + mes.slice(1, 3),
+          faltas: Math.round((faltas / total) * 100),
+          confirmados: Math.round((confirmados / total) * 100),
+        });
+      }
+
+      return meses;
+    },
+    enabled: !!empresaId,
+  });
+}
+
+// ── Crescimento de pacientes por mês ──
+
+export function usePacientesCrescimento() {
+  const empresaId = useEmpresaId();
+
+  return useQuery({
+    queryKey: ["relatorios_pacientes_crescimento", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+
+      const { data: clientes } = await supabase
+        .from("clientes")
+        .select("created_at, ativo")
+        .eq("empresa_id", empresaId);
+
+      const hoje = new Date();
+      const meses = [];
+
+      for (let i = 5; i >= 0; i--) {
+        const ref = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const fim = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 0);
+
+        const novos = (clientes || []).filter((c) => {
+          const d = new Date(c.created_at);
+          return d >= ref && d <= fim;
+        }).length;
+
+        const ativos = (clientes || []).filter((c) => {
+          const d = new Date(c.created_at);
+          return d <= fim && c.ativo;
+        }).length;
+
+        const mes = ref.toLocaleDateString("pt-BR", { month: "short" });
+        meses.push({
+          mes: mes.charAt(0).toUpperCase() + mes.slice(1, 3),
+          novos,
+          ativos,
+        });
+      }
+
+      return meses;
+    },
+    enabled: !!empresaId,
+  });
+}

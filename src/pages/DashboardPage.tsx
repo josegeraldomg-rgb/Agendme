@@ -1,27 +1,23 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, DollarSign, Users, Clock, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, DollarSign, Users, Clock, Plus, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { useDashboardStats } from "@/hooks/use-faturas";
+import { useDashboardFluxoSemanal } from "@/hooks/use-dashboard-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAgendamentos } from "@/hooks/use-agendamentos";
 import { format } from "date-fns";
-
-const chartData = [
-  { name: "Seg", receita: 1200, despesa: 400 },
-  { name: "Ter", receita: 1800, despesa: 300 },
-  { name: "Qua", receita: 950, despesa: 600 },
-  { name: "Qui", receita: 2200, despesa: 500 },
-  { name: "Sex", receita: 1600, despesa: 350 },
-  { name: "Sáb", receita: 800, despesa: 200 },
-];
 
 const DashboardPage = () => {
   const { empresa } = useEmpresa();
   const { data: stats, isLoading } = useDashboardStats();
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: agendamentosHoje } = useAgendamentos({ data: today });
+  const [periodo, setPeriodo] = useState<"semana" | "mes">("semana");
+  const { data: fluxoData = [], isLoading: fluxoLoading } = useDashboardFluxoSemanal(periodo);
 
   return (
     <div className="space-y-6">
@@ -109,28 +105,50 @@ const DashboardPage = () => {
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "300ms" }}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Fluxo Financeiro Semanal</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Fluxo Financeiro</CardTitle>
+              <Select value={periodo} onValueChange={(v) => setPeriodo(v as "semana" | "mes")}>
+                <SelectTrigger className="w-[120px] h-8 text-xs rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semana">Semana</SelectItem>
+                  <SelectItem value="mes">Mês</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" fontSize={12} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis fontSize={12} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                      fontSize: 13,
-                    }}
-                    formatter={(value: number) => `R$ ${value}`}
-                  />
-                  <Bar dataKey="receita" fill="hsl(var(--chart-receita))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesa" fill="hsl(var(--chart-despesa))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {fluxoLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : fluxoData.every((d) => d.receita === 0) ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <DollarSign className="h-10 w-10 opacity-20 mb-2" />
+                  <p className="text-sm">Nenhuma receita no período</p>
+                  <p className="text-xs">Registre receitas no Financeiro para ver o gráfico</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={fluxoData} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" fontSize={12} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis fontSize={12} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "var(--radius)",
+                        fontSize: 13,
+                      }}
+                      formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                    />
+                    <Bar dataKey="receita" name="Receita" fill="hsl(var(--chart-receita))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>

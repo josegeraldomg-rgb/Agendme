@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 // ── Todas as empresas (para saas_owner) ──
 export function useSaasEmpresas(search?: string) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_empresas", search],
     queryFn: async () => {
@@ -24,11 +26,13 @@ export function useSaasEmpresas(search?: string) {
       }
       return data || [];
     },
+    enabled: !!session,
   });
 }
 
 // ── KPIs do dashboard SaaS ──
 export function useSaasKpis() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_kpis"],
     queryFn: async () => {
@@ -57,11 +61,13 @@ export function useSaasKpis() {
 
       return { total, ativas, inadimplentes, suspensas, novasMes, mrr };
     },
+    enabled: !!session,
   });
 }
 
 // ── Receita mensal (últimos 6 meses) via saas_pagamentos ──
 export function useSaasReceitaMensal() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_receita_mensal"],
     queryFn: async () => {
@@ -84,11 +90,13 @@ export function useSaasReceitaMensal() {
       }
       return meses;
     },
+    enabled: !!session,
   });
 }
 
 // ── Crescimento de empresas (últimos 6 meses) ──
 export function useSaasEmpresasCrescimento() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_crescimento"],
     queryFn: async () => {
@@ -111,11 +119,13 @@ export function useSaasEmpresasCrescimento() {
       }
       return meses;
     },
+    enabled: !!session,
   });
 }
 
 // ── Pagamentos SaaS ──
 export function useSaasPagamentos(statusFilter?: string) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_pagamentos", statusFilter],
     queryFn: async () => {
@@ -133,6 +143,7 @@ export function useSaasPagamentos(statusFilter?: string) {
       if (error) throw error;
       return data || [];
     },
+    enabled: !!session,
   });
 }
 
@@ -179,6 +190,7 @@ export function useUpdateEmpresaConfig() {
 
 // ── Logs globais (audit_log sem filtro de empresa) ──
 export function useSaasAuditLogs(limit = 50, origemFilter?: string) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["saas_audit_logs", origemFilter, limit],
     queryFn: async () => {
@@ -196,5 +208,6 @@ export function useSaasAuditLogs(limit = 50, origemFilter?: string) {
       if (error) throw error;
       return data || [];
     },
+    enabled: !!session,
   });
 }

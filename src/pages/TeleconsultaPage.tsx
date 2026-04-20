@@ -2,13 +2,17 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  Video, Activity, History, Clock, Users, Calendar, User, Copy, Play
+  Video, Activity, History, Clock, Users, Calendar, User, Copy, Play, Plus
 } from "lucide-react";
-import { useTeleconsultas, useUpdateTeleconsultaStatus } from "@/hooks/use-teleconsultas";
+import { useTeleconsultas, useUpdateTeleconsultaStatus, useCreateTeleconsulta } from "@/hooks/use-teleconsultas";
+import { useClientes } from "@/hooks/use-clientes";
+import { useProfissionais } from "@/hooks/use-agendamentos";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +35,18 @@ export default function TeleconsultaPage() {
   
   const { data: sessions = [], isLoading } = useTeleconsultas(filterStatus, searchTerm);
   const { mutate: updateStatus } = useUpdateTeleconsultaStatus();
+  const createTeleconsulta = useCreateTeleconsulta();
+  const { data: pacientes = [] } = useClientes();
+  const { data: profissionais = [] } = useProfissionais();
+
+  // Dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newForm, setNewForm] = useState({
+    paciente_id: "",
+    profissional_id: "",
+    data: format(new Date(), "yyyy-MM-dd"),
+    hora: "09:00",
+  });
 
   // Jitsi states
   const [activeSession, setActiveSession] = useState<any | null>(null);
@@ -123,6 +139,10 @@ export default function TeleconsultaPage() {
           </h1>
           <p className="text-muted-foreground text-sm">Atendimentos remotos por vídeo integrados ao Jitsi</p>
         </div>
+        <Button className="gap-2" onClick={() => setShowCreateDialog(true)}>
+          <Plus className="h-4 w-4" />
+          Nova Teleconsulta
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -247,6 +267,85 @@ export default function TeleconsultaPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog — Nova Teleconsulta */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              Nova Teleconsulta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Paciente *</Label>
+              <Select value={newForm.paciente_id} onValueChange={(v) => setNewForm((f) => ({ ...f, paciente_id: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecione o paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pacientes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Profissional *</Label>
+              <Select value={newForm.profissional_id} onValueChange={(v) => setNewForm((f) => ({ ...f, profissional_id: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecione o profissional" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profissionais.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Data *</Label>
+                <Input
+                  type="date"
+                  className="mt-1"
+                  value={newForm.data}
+                  onChange={(e) => setNewForm((f) => ({ ...f, data: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Horário *</Label>
+                <Input
+                  type="time"
+                  className="mt-1"
+                  value={newForm.hora}
+                  onChange={(e) => setNewForm((f) => ({ ...f, hora: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
+            <Button
+              disabled={!newForm.paciente_id || !newForm.profissional_id || !newForm.data || !newForm.hora || createTeleconsulta.isPending}
+              onClick={() => {
+                createTeleconsulta.mutate(
+                  { paciente_id: newForm.paciente_id, profissional_id: newForm.profissional_id, data: newForm.data, hora: newForm.hora },
+                  {
+                    onSuccess: () => {
+                      setShowCreateDialog(false);
+                      setNewForm({ paciente_id: "", profissional_id: "", data: format(new Date(), "yyyy-MM-dd"), hora: "09:00" });
+                    },
+                  }
+                );
+              }}
+            >
+              {createTeleconsulta.isPending ? "Criando..." : "Criar Teleconsulta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

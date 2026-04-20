@@ -10,7 +10,7 @@ import logo from "@/assets/logo-agendme.png";
 export default function ClientLoginPage() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
-  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { signIn, signUp, resetPassword, user, loading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -54,6 +54,21 @@ export default function ClientLoginPage() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      toast({ title: "Informe seu email", description: "Digite seu email acima para receber o link de redefinição.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    const { error } = await resetPassword(email);
+    setLoading(false);
+    if (error) {
+      toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir a senha." });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
       <div className="w-full max-w-sm space-y-6">
@@ -65,31 +80,33 @@ export default function ClientLoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <>
-              <div>
-                <Label className="text-sm">Nome</Label>
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="mt-1 h-11 rounded-xl" />
-              </div>
-              <div>
-                <Label className="text-sm">Telefone</Label>
-                <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" className="mt-1 h-11 rounded-xl" />
-              </div>
-            </>
-          )}
-          <div>
-            <Label className="text-sm">Email</Label>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="seu@email.com" className="mt-1 h-11 rounded-xl" />
-          </div>
-          <div>
-            <Label className="text-sm">Senha</Label>
-            <Input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" placeholder="••••••••" className="mt-1 h-11 rounded-xl" />
-          </div>
-          <Button type="submit" className="w-full h-12 rounded-xl text-sm font-semibold" disabled={loading}>
-            {loading ? "Aguarde..." : isLogin ? "Entrar" : "Criar Conta"}
-          </Button>
-        </form>
+        <div className="bg-card rounded-2xl border border-border p-6 space-y-4 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <>
+                <div>
+                  <Label className="text-sm">Nome</Label>
+                  <Input id="input-client-nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="mt-1 h-11 rounded-xl" />
+                </div>
+                <div>
+                  <Label className="text-sm">Telefone</Label>
+                  <Input id="input-client-telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" className="mt-1 h-11 rounded-xl" />
+                </div>
+              </>
+            )}
+            <div>
+              <Label className="text-sm">Email</Label>
+              <Input id="input-client-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="seu@email.com" className="mt-1 h-11 rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-sm">Senha</Label>
+              <Input id="input-client-senha" value={senha} onChange={(e) => setSenha(e.target.value)} type="password" placeholder="••••••••" className="mt-1 h-11 rounded-xl" />
+            </div>
+            <Button type="submit" className="w-full h-12 rounded-xl text-sm font-semibold" disabled={loading}>
+              {loading ? "Aguarde..." : isLogin ? "Entrar" : "Criar Conta"}
+            </Button>
+          </form>
+        </div>
 
         <p className="text-center text-sm text-muted-foreground">
           {isLogin ? "Não tem conta? " : "Já tem conta? "}
@@ -100,7 +117,14 @@ export default function ClientLoginPage() {
 
         {isLogin && (
           <p className="text-center">
-            <button className="text-xs text-muted-foreground hover:text-primary">Esqueci minha senha</button>
+            <button
+              id="btn-esqueci-senha-client"
+              onClick={handleForgotPassword}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              disabled={loading}
+            >
+              Esqueci minha senha
+            </button>
           </p>
         )}
       </div>
