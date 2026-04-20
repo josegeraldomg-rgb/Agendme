@@ -22,36 +22,47 @@ export function ClientEmpresaProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const fetchEmpresa = async () => {
-      const { data, error } = await supabase
-        .from("empresas")
-        .select("*")
-        .eq("slug", slug)
-        .in("status", ["ativa", "trial"])
-        .single();
+    // Failsafe: ensure loading always ends even if Supabase hangs
+    const failsafe = setTimeout(() => setLoading(false), 5000);
 
-      if (!error && data) {
-        setEmpresa({
-          id: data.id,
-          nome: data.nome,
-          slug: data.slug,
-          email: data.email,
-          telefone: data.telefone,
-          plano: data.plano,
-          status: data.status,
-          logo_url: data.logo_url,
-          dominio_customizado: data.dominio_customizado,
-          subdominio: data.subdominio,
-          config: (data.config as Record<string, unknown>) || {},
-          limites: (data.limites as any) || {},
-          white_label: (data.white_label as Record<string, unknown>) || {},
-          created_at: data.created_at,
-        });
+    const fetchEmpresa = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("empresas")
+          .select("*")
+          .eq("slug", slug)
+          .in("status", ["ativa", "trial"])
+          .maybeSingle();
+
+        if (!error && data) {
+          setEmpresa({
+            id: data.id,
+            nome: data.nome,
+            slug: data.slug,
+            email: data.email,
+            telefone: data.telefone,
+            plano: data.plano,
+            status: data.status,
+            logo_url: data.logo_url,
+            dominio_customizado: data.dominio_customizado,
+            subdominio: data.subdominio,
+            config: (data.config as Record<string, unknown>) || {},
+            limites: (data.limites as any) || {},
+            white_label: (data.white_label as Record<string, unknown>) || {},
+            created_at: data.created_at,
+          });
+        }
+      } catch (err) {
+        console.warn("Erro ao buscar empresa por slug:", err);
+      } finally {
+        clearTimeout(failsafe);
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchEmpresa();
+
+    return () => clearTimeout(failsafe);
   }, [slug]);
 
   return (
