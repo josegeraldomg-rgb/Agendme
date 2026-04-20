@@ -52,9 +52,17 @@ function ClientNotFound() {
 }
 
 function ClientLayoutInner() {
-  const { empresa } = useClientEmpresa();
+  const { empresa, loading } = useClientEmpresa();
   const location = useLocation();
   const { slug } = useParams<{ slug: string }>();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   if (!empresa) return <ClientNotFound />;
 

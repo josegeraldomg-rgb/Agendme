@@ -27,7 +27,7 @@ export function ClientEmpresaProvider({ children }: { children: ReactNode }) {
         .from("empresas")
         .select("*")
         .eq("slug", slug)
-        .eq("status", "ativa")
+        .in("status", ["ativa", "trial"])
         .single();
 
       if (!error && data) {
