@@ -55,6 +55,67 @@ interface LogAcesso {
   resultado: "permitido" | "negado";
 }
 
+/* ───── tipo local ───── */
+type UsuarioLocal = Usuario;
+
+/* ───── Mock: ações RBAC ───── */
+const acoesMock = ["visualizar", "criar", "editar", "excluir"];
+
+/* ───── Mock: módulos do sistema ───── */
+const modulosMock = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "agenda", label: "Agenda", icon: Calendar },
+  { key: "ausencias", label: "Ausências", icon: CalendarOff },
+  { key: "pacientes", label: "Pacientes", icon: Users },
+  { key: "servicos", label: "Serviços", icon: Briefcase },
+  { key: "prontuario", label: "Prontuário", icon: Stethoscope },
+  { key: "financeiro", label: "Financeiro", icon: DollarSign },
+  { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { key: "configuracoes", label: "Configurações", icon: Settings },
+];
+
+/* ───── Permissões derivadas (módulo × ação) ───── */
+const allPermissoes: Permissao[] = modulosMock.flatMap((mod) =>
+  acoesMock.map((acao) => ({
+    id: `${mod.key}.${acao}`,
+    nome: `${mod.key}.${acao}`,
+    modulo: mod.key,
+    descricao: `${acao} em ${mod.label}`,
+  }))
+);
+
+/* ───── Mock: perfis de acesso padrão ───── */
+const defaultRoles: Role[] = [
+  {
+    id: "admin",
+    nome: "Administrador",
+    descricao: "Acesso total ao sistema",
+    permissoes: allPermissoes.map((p) => p.id),
+    isDefault: true,
+  },
+  {
+    id: "profissional",
+    nome: "Profissional",
+    descricao: "Acesso à agenda, prontuário e pacientes",
+    permissoes: allPermissoes
+      .filter((p) => ["agenda", "prontuario", "pacientes", "dashboard"].includes(p.modulo))
+      .map((p) => p.id),
+    isDefault: true,
+  },
+  {
+    id: "recepcionista",
+    nome: "Recepcionista",
+    descricao: "Acesso à agenda e pacientes",
+    permissoes: allPermissoes
+      .filter((p) =>
+        ["agenda", "pacientes", "dashboard"].includes(p.modulo) &&
+        ["visualizar", "criar", "editar"].includes(p.nome.split(".")[1])
+      )
+      .map((p) => p.id),
+    isDefault: true,
+  },
+];
+
 /* ─────────────────── COMPONENTE PRINCIPAL ─────────────────── */
 const UsuariosPermissoesPage = () => {
   const { data: usuariosDB = [], isLoading: loadingUsers } = useUsuarios();
@@ -74,8 +135,8 @@ const UsuariosPermissoesPage = () => {
     };
   }), [usuariosDB, rolesDB]);
 
-  // Static roles definition (UI level — actual enforcement is via Supabase RLS)
-  const roles = rolesMock;
+  // Roles state (initialized from defaults, editable in UI)
+  const [roles, setRoles] = useState<Role[]>(defaultRoles);
   // Empty access logs — would come from audit_log table (Épico 1.4)
   const logs: LogAcesso[] = [];
 

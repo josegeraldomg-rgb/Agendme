@@ -4,79 +4,72 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-// ── Categorias de serviços por empresa ──
+// ── Helper: fetch público via REST (anon key) ──
+// Usa a mesma estratégia do ClientEmpresaContext para bypass de sessão ativa.
+// Isso garante que as RLS policies públicas (portal do cliente) sejam usadas
+// mesmo quando um admin/clínica está logado no mesmo navegador.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://zopywhhhotwvnmynuirc.supabase.co";
+const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvcHl3aGhob3R3dm5teW51aXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMTMwMDUsImV4cCI6MjA5MTY4OTAwNX0.i0Z34J8pUpT0pOZFr4wFN89iSBD0_41NKtpKqRyg-To";
+
+async function anonFetch<T = any>(path: string): Promise<T[]> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: ANON_KEY, Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`REST ${res.status}: ${res.statusText}`);
+  const json = await res.json();
+  return Array.isArray(json) ? json : [];
+}
+
+// ── Categorias de serviços por empresa (via REST público) ──
 export function useClientCategorias(empresaId?: string) {
   return useQuery({
     queryKey: ["client_categorias", empresaId],
     queryFn: async () => {
       if (!empresaId) return [];
-      const { data, error } = await supabase
-        .from("categorias_servicos")
-        .select("id, nome, descricao, icone, ativo, ordem")
-        .eq("empresa_id", empresaId)
-        .eq("ativo", true)
-        .order("ordem", { ascending: true });
-      if (error) throw error;
-      return data || [];
+      return anonFetch(
+        `categorias_servicos?empresa_id=eq.${empresaId}&ativo=eq.true&select=id,nome,descricao,icone,ativo,ordem&order=ordem.asc`
+      );
     },
     enabled: !!empresaId,
   });
 }
 
-// ── Serviços por categoria ──
+// ── Serviços por categoria (via REST público) ──
 export function useClientServicos(empresaId?: string, categoriaId?: string) {
   return useQuery({
     queryKey: ["client_servicos", empresaId, categoriaId],
     queryFn: async () => {
       if (!empresaId) return [];
-      let query = supabase
-        .from("servicos")
-        .select("id, nome, descricao, preco, duracao_minutos, categoria_id, whatsapp_only, categorias_servicos(nome)")
-        .eq("empresa_id", empresaId)
-        .eq("ativo", true)
-        .order("nome");
-
-      if (categoriaId) {
-        query = query.eq("categoria_id", categoriaId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      let path = `servicos?empresa_id=eq.${empresaId}&ativo=eq.true&select=id,nome,descricao,preco,duracao_minutos,categoria_id,whatsapp_only&order=nome.asc`;
+      if (categoriaId) path += `&categoria_id=eq.${categoriaId}`;
+      return anonFetch(path);
     },
     enabled: !!empresaId,
   });
 }
 
-// ── Profissionais que atendem um serviço ──
+// ── Profissionais (via REST público) ──
 export function useClientProfissionais(empresaId?: string, servicoId?: string) {
   return useQuery({
     queryKey: ["client_profissionais", empresaId, servicoId],
     queryFn: async () => {
       if (!empresaId) return [];
 
+      // All active profissionais for the company
+      const profissionais = await anonFetch<{ id: string; nome: string; especialidade?: string; bio?: string; avatar_url?: string }>(
+        `profissionais_clinica?empresa_id=eq.${empresaId}&ativo=eq.true&select=id,nome,especialidade,bio,avatar_url&order=nome.asc`
+      );
+
       if (servicoId) {
-        // Get profissionais linked to this service
-        const { data, error } = await supabase
-          .from("profissional_servicos")
-          .select("profissional_id, profissionais_clinica(id, nome, especialidade, bio, avatar_url, ativo)")
-          .eq("servico_id", servicoId);
-        if (error) throw error;
-        return (data || [])
-          .map((ps) => ps.profissionais_clinica)
-          .filter((p) => p && (p as { ativo?: boolean }).ativo !== false)
-          .filter(Boolean) as Array<{ id: string; nome: string; especialidade?: string; bio?: string; avatar_url?: string }>;
+        // Filter by service linkage
+        const links = await anonFetch<{ profissional_id: string }>(
+          `profissional_servicos?servico_id=eq.${servicoId}&select=profissional_id`
+        );
+        const linkedIds = new Set(links.map((l) => l.profissional_id));
+        return profissionais.filter((p) => linkedIds.has(p.id));
       }
 
-      // All active profissionais for the company
-      const { data, error } = await supabase
-        .from("profissionais_clinica")
-        .select("id, nome, especialidade, bio, avatar_url")
-        .eq("empresa_id", empresaId)
-        .eq("ativo", true)
-        .order("nome");
-      if (error) throw error;
-      return data || [];
+      return profissionais;
     },
     enabled: !!empresaId,
   });
