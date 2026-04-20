@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
@@ -34,17 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Flag to prevent getSession from overwriting state already set by onAuthStateChange
-  // This fixes a race condition that causes infinite loading in production (Vercel cold starts)
-  const initializedRef = useRef(false);
-
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .maybeSingle(); // Usar maybeSingle em vez de single() evita erro 406
+        .maybeSingle();
       
       if (!error && data) {
         setProfile(data as Profile);
@@ -65,57 +61,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   useEffect(() => {
-    // Failsafe de timeout para forçar a renderização se o SDK do Supabase travar silenciosamente
-    const failsafe = setTimeout(() => {
-      setLoading(false);
-    }, 3000);
+    let mounted = true;
 
-    // onAuthStateChange is the source of truth for session changes.
-    // It fires first on page load with the persisted session (INITIAL_SESSION event).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        try {
-          initializedRef.current = true; // Mark as initialized so getSession below is skipped
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-          }
-        } catch (err) {
-          console.error("Erro no onAuthStateChange", err);
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
-
-    // getSession is a fallback for environments where onAuthStateChange
-    // may not fire (e.g. Safari private mode). Skip if already initialized.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (initializedRef.current) return; // onAuthStateChange already handled this
+    // 1) Bootstrap: get the persisted session synchronously-ish
+    // This is the ONLY place we set the initial auth state.
+    async function bootstrap() {
       try {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        if (initialSession?.user) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await fetchProfile(initialSession.user.id);
+        } else {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
         }
       } catch (err) {
         console.error("Erro ao carregar sessão inicial", err);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
-    }).catch(err => {
-      console.error("Erro fatal no getSession do Supabase", err);
-      setLoading(false);
-    });
+    }
+
+    bootstrap();
+
+    // 2) Listen for SUBSEQUENT auth changes (sign-in, sign-out, token refresh)
+    // IMPORTANT: Do NOT do heavy async work inside this callback.
+    // Supabase docs warn that making Supabase calls inside this listener
+    // can cause deadlocks. We use setTimeout(0) to move fetchProfile
+    // out of the listener's synchronous call stack.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        if (!mounted) return;
+
+        // Skip INITIAL_SESSION — already handled by bootstrap above
+        if (event === "INITIAL_SESSION") return;
+
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (newSession?.user) {
+          // Defer the profile fetch to avoid Supabase listener deadlock
+          setTimeout(() => {
+            if (mounted) fetchProfile(newSession.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+
+        // On sign out, clear all cached queries
+        if (event === "SIGNED_OUT") {
+          queryClient.clear();
+        }
+      }
+    );
 
     return () => {
-      clearTimeout(failsafe);
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, queryClient]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -135,12 +144,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear state BEFORE calling Supabase to avoid stale renders
     setUser(null);
     setSession(null);
     setProfile(null);
-    // Limpar todo o cache de queries para evitar dados stale entre painéis
-    try { queryClient.clear(); } catch { /* ignore if not mounted */ }
+    queryClient.clear();
+    await supabase.auth.signOut();
   };
 
   const resetPassword = async (email: string) => {

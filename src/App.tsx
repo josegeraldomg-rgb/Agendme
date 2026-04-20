@@ -47,7 +47,21 @@ import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't retry auth/RLS errors — they won't fix themselves
+      retry: (failureCount, error: any) => {
+        const status = error?.status || error?.code;
+        if (status === 401 || status === 403 || status === "PGRST301") return false;
+        return failureCount < 2;
+      },
+      // Prevent refetch storms during navigation
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
