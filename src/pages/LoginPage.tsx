@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,22 @@ import logo from "@/assets/logo-agendme.png";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, user, loading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgot, setIsForgot] = useState(false);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect to dashboard once AuthContext confirms the user is authenticated.
+  // This avoids a race condition where navigate() is called before onAuthStateChange
+  // has had time to update the user state, causing ProtectedRoute to redirect back to /login.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,10 +52,8 @@ export default function LoginPage() {
       setLoading(false);
       if (error) {
         toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Login realizado com sucesso!" });
-        navigate("/dashboard");
       }
+      // On success: the useEffect above handles navigation once AuthContext updates user
     } else {
       const { error } = await signUp(email, senha, { nome });
       setLoading(false);

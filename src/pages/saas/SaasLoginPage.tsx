@@ -1,19 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo-agendme.png";
 
 export default function SaasLoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Navigate to SaaS dashboard once AuthContext confirms the user is authenticated.
+  // Avoids the race condition where ProtectedRoute redirects back before user state is set.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/saas/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async () => {
     if (!email.trim() || !senha.trim()) {
@@ -23,24 +30,14 @@ export default function SaasLoginPage() {
     setLoading(true);
     
     try {
-      console.log("Forçando signOut prévio...");
-      await supabase.auth.signOut().catch(e => console.error("SignOut falhou (ignorado)", e));
-      
-      console.log("Chamando signInAuthContext...");
       const { error } = await signIn(email, senha);
-      
-      console.log("SignIn retornou. Erro?", error);
       if (error) {
         toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
         setLoading(false);
-      } else {
-        toast({ title: "Login realizado com sucesso!" });
-        setTimeout(() => {
-          window.location.href = "/saas/dashboard"; // Forçamos hard-redirect ao invés do React Router p/ limpar qualquer cache
-        }, 500);
       }
+      // On success: useEffect above handles navigation once AuthContext updates user
     } catch (err: any) {
-      console.error("Erro critico capturado:", err);
+      console.error("Erro crítico:", err);
       toast({ title: "Erro Crítico", description: err?.message || "Falha desconhecida", variant: "destructive" });
       setLoading(false);
     }
